@@ -21,8 +21,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
 
-# Retrieve token from secrets or fallback to default
-ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YTMwY2UxNTY4ODI0Zjc3ZDc1NmU3NjgiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc4MTU4MzM4MSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODEzMTgzMjAwfQ.IoRDQhbhcn3w9Fkw75N3eBSamLcaA8GcAhVjf5K-iL8")
+ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "YOUR_UPSTOX_ACCESS_TOKEN_HERE")
 REFRESH_INTERVAL_SECONDS = 5
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
@@ -61,7 +60,7 @@ def _fetch_single_10d_vol(key, access_token, to_date, from_date):
                     return key, sum(vols) / len(vols)
     except Exception:
         pass
-    return key, 1.0
+    return key, 0.0
 
 @st.cache_data(ttl=86400)
 def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
@@ -77,14 +76,17 @@ def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
         ]
         for future in as_completed(futures):
             key, vol = future.result()
+            # Multi-format indexing for seamless lookups
             avg_volumes[key] = vol
+            avg_volumes[key.replace('|', ':')] = vol
+            avg_volumes[key.replace(':', '|')] = vol
             
     return avg_volumes
 
 def fetch_live_quotes_parallel(instrument_keys, access_token):
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     url = "https://api.upstox.com/v2/market-quote/quotes"
-    batch_size = 50  # Upstox recommended batch size
+    batch_size = 50
     batches = [instrument_keys[i:i + batch_size] for i in range(0, len(instrument_keys), batch_size)]
     
     quotes_data = {}
@@ -117,13 +119,11 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
     if not quotes_dict:
         return pd.DataFrame()
 
-    # Pre-index normalized lookup keys
     normalized_quotes = {}
     for k, v in quotes_dict.items():
         normalized_quotes[k] = v
         normalized_quotes[k.replace(':', '|')] = v
         normalized_quotes[k.replace('|', ':')] = v
-        # Extract trading symbol suffix if present
         if ':' in k:
             normalized_quotes[k.split(':')[1]] = v
         if '|' in k:
@@ -148,25 +148,47 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         volume = float(quote.get('volume') or 0)
         vwap = float(quote.get('average_price') or ltp)
         
+        # --- FIX: CHANGE_% CALCULATION ---
+        net_change = quote.get('net_change')
         ohlc = quote.get('ohlc') or {}
-        close = float(ohlc.get('close') or quote.get('prev_close') or ltp)
+        close_price = float(ohlc.get('close') or quote.get('prev_close') or 0.0)
+
+        if net_change is not None and ltp > 0:
+            p_change = float(net_change)
+            prev_close = ltp - p_change
+            p_change = (p_change / prev_close * 100) if prev_close > 0 else 0.0
+        elif close_price > 0 and close_price != ltp:
+            p_change = ((ltp - close_price) / close_price) * 100
+        else:
+            p_change = 0.0
         
         buy_qty = float(quote.get('total_buy_quantity') or 0)
         sell_qty = float(quote.get('total_sell_quantity') or 0)
         
-        avg_vol = avg_10d_vol_dict.get(key, 1.0)
-        vol_ratio = volume / avg_vol if avg_vol > 0 else 1.0
-        p_change = ((ltp - close) / close * 100) if close > 0 else 0.0
-        vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
+        # --- FIX: INST_SCORE & VOLUME RATIO ---
+        avg_vol = avg_10d_vol_dict.get(key, 0.0) or avg_10d_vol_dict.get(symbol, 0.0)
+        vol_ratio = (volume / avg_vol) if avg_vol > 0 else 1.0
+        vol_ratio_capped = min(vol_ratio, 10.0)  # Prevents extreme score spikes
         
+        vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
-        inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio - 1) * 0.5)
+        
+        inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)
+
+        # TradingView Direct Link
+        tv_url = f"https://www.tradingview.com/chart/?symbol=NSE:{symbol}&interval=5"
 
         records.append({
-            'SYMBOL': symbol, 'SECTOR': sector, 'LTP': ltp,
-            'CHANGE_%': p_change, 'VWAP_DIST_%': vwap_dist,
-            'FLOW_RATIO': flow_ratio, 'VOL_10D_RATIO': vol_ratio,
-            'INST_SCORE': inst_score, 'VOLUME': volume
+            'SYMBOL': symbol,
+            'CHART_URL': tv_url,
+            'SECTOR': sector,
+            'LTP': round(ltp, 2),
+            'CHANGE_%': round(p_change, 2),
+            'VWAP_DIST_%': round(vwap_dist, 2),
+            'FLOW_RATIO': round(flow_ratio, 2),
+            'VOL_10D_RATIO': round(vol_ratio, 2),
+            'INST_SCORE': round(inst_score, 2),
+            'VOLUME': int(volume)
         })
     return pd.DataFrame(records)
 
@@ -207,8 +229,6 @@ def dashboard_live_loop():
     if data_df.empty:
         st.error("⚠️ **Unable to load live quotes from Upstox API.**")
         if api_error:
-            if "401" in api_error or "Unauthorized" in api_error:
-                st.error("🔑 **Access Token Expired**: Upstox tokens expire daily at 3:30 AM. Please generate a new `ACCESS_TOKEN` in Secrets.")
             st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
         return
 
@@ -231,7 +251,18 @@ def dashboard_live_loop():
             "Bias": "BULLISH" if sector_score > 0.4 else ("BEARISH" if sector_score < -0.4 else "NEUTRAL")
         })
     
-    st.dataframe(pd.DataFrame(sector_stats).sort_values(by="Avg Change %", ascending=False), use_container_width=True)
+    st.dataframe(pd.DataFrame(sector_stats).sort_values(by="Avg Change %", ascending=False), use_container_width=True, hide_index=True)
+
+    # --- Table Config for Interactive TradingView Chart Hyperlinks ---
+    table_column_config = {
+        "CHART_URL": st.column_config.LinkColumn(
+            "SYMBOL",
+            help="Click symbol name to open 5m TradingView Chart",
+            display_text=r"https://www\.tradingview\.com/chart/\?symbol=NSE:(.*)&interval=5"
+        )
+    }
+
+    display_cols = ['CHART_URL', 'SECTOR', 'LTP', 'CHANGE_%', 'VWAP_DIST_%', 'FLOW_RATIO', 'INST_SCORE']
 
     # --- Top Stocks Columns ---
     col1, col2 = st.columns(2)
@@ -239,16 +270,20 @@ def dashboard_live_loop():
         st.subheader("Top 10 Bullish Momentum Leaders")
         bullish = data_df.sort_values(by='INST_SCORE', ascending=False).head(10)
         st.dataframe(
-            bullish[['SYMBOL', 'SECTOR', 'LTP', 'CHANGE_%', 'VWAP_DIST_%', 'FLOW_RATIO', 'INST_SCORE']],
-            use_container_width=True
+            bullish[display_cols],
+            column_config=table_column_config,
+            use_container_width=True,
+            hide_index=True
         )
 
     with col2:
         st.subheader("Top 10 Bearish Short Setups")
         bearish = data_df.sort_values(by='INST_SCORE', ascending=True).head(10)
         st.dataframe(
-            bearish[['SYMBOL', 'SECTOR', 'LTP', 'CHANGE_%', 'VWAP_DIST_%', 'FLOW_RATIO', 'INST_SCORE']],
-            use_container_width=True
+            bearish[display_cols],
+            column_config=table_column_config,
+            use_container_width=True,
+            hide_index=True
         )
 
 dashboard_live_loop()
