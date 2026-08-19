@@ -12,7 +12,7 @@ import streamlit as st
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Upstox F&O Institutional Radar",
+    page_title="Upstox F&O Institutional Sector Radar",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -31,6 +31,21 @@ if not os.path.exists(FNO_EXCEL_PATH) or not os.path.exists(INSTRUMENTS_CSV_PATH
     st.error("⚠️ **Required Data Files Missing!**")
     st.info(f"Looking in folder: `{BASE_DIR}`")
     st.stop()
+
+# ==========================================
+# FORMATTING HELPERS
+# ==========================================
+def format_volume(vol):
+    """Formats raw volume into standard K/M units."""
+    if vol >= 1_000_000:
+        return f"{vol / 1_000_000:.2f}M"
+    elif vol >= 1_000:
+        return f"{vol / 1_000:.1f}K"
+    return str(int(vol))
+
+def format_signed_pct(val):
+    """Formats percentage with explicit + / - signs."""
+    return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
 # ==========================================
 # 1. OPTIMIZED DATA LOADING & FETCHING
@@ -76,7 +91,6 @@ def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
         ]
         for future in as_completed(futures):
             key, vol = future.result()
-            # Multi-format indexing for seamless lookups
             avg_volumes[key] = vol
             avg_volumes[key.replace('|', ':')] = vol
             avg_volumes[key.replace(':', '|')] = vol
@@ -148,7 +162,6 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         volume = float(quote.get('volume') or 0)
         vwap = float(quote.get('average_price') or ltp)
         
-        # --- FIX: CHANGE_% CALCULATION ---
         net_change = quote.get('net_change')
         ohlc = quote.get('ohlc') or {}
         close_price = float(ohlc.get('close') or quote.get('prev_close') or 0.0)
@@ -165,30 +178,33 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         buy_qty = float(quote.get('total_buy_quantity') or 0)
         sell_qty = float(quote.get('total_sell_quantity') or 0)
         
-        # --- FIX: INST_SCORE & VOLUME RATIO ---
         avg_vol = avg_10d_vol_dict.get(key, 0.0) or avg_10d_vol_dict.get(symbol, 0.0)
         vol_ratio = (volume / avg_vol) if avg_vol > 0 else 1.0
-        vol_ratio_capped = min(vol_ratio, 10.0)  # Prevents extreme score spikes
+        vol_ratio_capped = min(vol_ratio, 10.0)
         
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
         
         inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)
 
-        # TradingView Direct Link
         tv_url = f"https://www.tradingview.com/chart/?symbol=NSE:{symbol}&interval=5"
 
         records.append({
             'SYMBOL': symbol,
             'CHART_URL': tv_url,
             'SECTOR': sector,
-            'LTP': round(ltp, 2),
+            'LTP (₹)': round(ltp, 2),
             'CHANGE_%': round(p_change, 2),
+            'CHANGE_STR': format_signed_pct(p_change),
             'VWAP_DIST_%': round(vwap_dist, 2),
-            'FLOW_RATIO': round(flow_ratio, 2),
-            'VOL_10D_RATIO': round(vol_ratio, 2),
+            'VWAP_DIST_STR': format_signed_pct(vwap_dist),
+            'VOLUME_RAW': int(volume),
+            'Volume': format_volume(volume),
+            'VOL_10D_RATIO_RAW': round(vol_ratio, 2),
+            'Vol / 10D Vol': f"{vol_ratio:.2f}x",
+            'FLOW_RATIO_RAW': round(flow_ratio, 2),
+            'Order Flow': f"{flow_ratio:.2f}x",
             'INST_SCORE': round(inst_score, 2),
-            'VOLUME': int(volume)
         })
     return pd.DataFrame(records)
 
@@ -221,7 +237,7 @@ def dashboard_live_loop():
     if market_status:
         st.success(f"🟢 **MARKET LIVE** — Last Updated: {now_str}")
     else:
-        st.warning(f"🔴 **MARKET CLOSED / FROZEN** — Showing final data as of cutoff time. Current time: {now_str}")
+        st.warning(f"🔴 **MARKET CLOSED / FROZEN** — Showing final market data. Current time: {now_str}")
 
     quotes, api_error = fetch_live_quotes_parallel(unique_keys, ACCESS_TOKEN)
     data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
@@ -239,38 +255,50 @@ def dashboard_live_loop():
         avg_chg = group['CHANGE_%'].mean()
         advances = (group['CHANGE_%'] > 0).sum()
         declines = (group['CHANGE_%'] < 0).sum()
+        total_stocks = len(group)
+        breadth_ratio = (advances - declines) / total_stocks if total_stocks > 0 else 0.0
         top_stock = group.loc[group['INST_SCORE'].idxmax()]['SYMBOL'] if not group.empty else "N/A"
-        sector_score = avg_chg + (0.75 * ((advances - declines) / len(group)))
+        sector_score = avg_chg + (0.75 * breadth_ratio)
         
         sector_stats.append({
             "Sector": sector,
-            "Avg Change %": round(avg_chg, 2),
+            "Avg Change %": format_signed_pct(avg_chg),
             "Adv/Dec": f"{advances}/{declines}",
-            "Avg Order Flow": round(group['FLOW_RATIO'].mean(), 2),
+            "Breadth Ratio": f"{breadth_ratio:+.2f}",
+            "Avg Order Flow": f"{group['FLOW_RATIO_RAW'].mean():.2f}x",
             "Top Stock": top_stock,
-            "Bias": "BULLISH" if sector_score > 0.4 else ("BEARISH" if sector_score < -0.4 else "NEUTRAL")
+            "Sector Momentum": "BULLISH" if sector_score > 0.3 else ("BEARISH" if sector_score < -0.3 else "NEUTRAL"),
+            "_SORT_CHG": avg_chg
         })
     
-    st.dataframe(pd.DataFrame(sector_stats).sort_values(by="Avg Change %", ascending=False), use_container_width=True, hide_index=True)
+    sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
+    st.dataframe(sector_df, use_container_width=True, hide_index=True)
 
     # --- Table Config for Interactive TradingView Chart Hyperlinks ---
     table_column_config = {
         "CHART_URL": st.column_config.LinkColumn(
-            "SYMBOL",
-            help="Click symbol name to open 5m TradingView Chart",
-            display_text=r"https://www\.tradingview\.com/chart/\?symbol=NSE:(.*)&interval=5"
+            "Symbol",
+            help="Click symbol name to open TradingView chart",
+            display_text=r"symbol=NSE:([^&]+)"
         )
     }
 
-    display_cols = ['CHART_URL', 'SECTOR', 'LTP', 'CHANGE_%', 'VWAP_DIST_%', 'FLOW_RATIO', 'INST_SCORE']
+    display_cols = [
+        'CHART_URL', 'SECTOR', 'LTP (₹)', 'CHANGE_STR', 
+        'VWAP_DIST_STR', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'INST_SCORE'
+    ]
 
-    # --- Top Stocks Columns ---
+    # --- Deduplicate Stocks for Top 10 Leaders ---
+    unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
+
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Top 10 Bullish Momentum Leaders")
-        bullish = data_df.sort_values(by='INST_SCORE', ascending=False).head(10)
+        bullish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=False).head(10).copy()
+        bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
         st.dataframe(
-            bullish[display_cols],
+            bullish[cols_bullish],
             column_config=table_column_config,
             use_container_width=True,
             hide_index=True
@@ -278,9 +306,11 @@ def dashboard_live_loop():
 
     with col2:
         st.subheader("Top 10 Bearish Short Setups")
-        bearish = data_df.sort_values(by='INST_SCORE', ascending=True).head(10)
+        bearish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=True).head(10).copy()
+        bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
         st.dataframe(
-            bearish[display_cols],
+            bearish[cols_bearish],
             column_config=table_column_config,
             use_container_width=True,
             hide_index=True
