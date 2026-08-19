@@ -21,8 +21,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
 
-ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YTMwY2UxNTY4ODI0Zjc3ZDc1NmU3NjgiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc4MTU4MzM4MSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODEzMTgzMjAwfQ.IoRDQhbhcn3w9Fkw75N3eBSamLcaA8GcAhVjf5K-iL8")
-REFRESH_INTERVAL_SECONDS = 5
+ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "YOUR_UPSTOX_ACCESS_TOKEN_HERE")
+REFRESH_INTERVAL_SECONDS = 10  # Increased to 10s to stay safely under 429 rate limits
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
@@ -48,7 +48,7 @@ def format_signed_pct(val):
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
 # ==========================================
-# 1. OPTIMIZED DATA LOADING & FETCHING
+# 1. DATA LOADING & RATE-LIMITED FETCHING
 # ==========================================
 @st.cache_data(ttl=86400)
 def load_instrument_mapping(excel_path, csv_path):
@@ -65,26 +65,31 @@ def _fetch_single_10d_vol(key, access_token, to_date, from_date):
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     encoded_key = urllib.parse.quote(key, safe='|:')
     url = f"https://api.upstox.com/v2/historical-candle/{encoded_key}/day/{to_date}/{from_date}"
-    try:
-        res = requests.get(url, headers=headers, timeout=4)
-        if res.status_code == 200:
-            candles = res.json().get('data', {}).get('candles', [])
-            if candles:
-                vols = [c[5] for c in candles[1:11]]
-                if vols:
-                    return key, sum(vols) / len(vols)
-    except Exception:
-        pass
+    
+    for attempt in range(2):
+        try:
+            res = requests.get(url, headers=headers, timeout=4)
+            if res.status_code == 200:
+                candles = res.json().get('data', {}).get('candles', [])
+                if candles:
+                    vols = [c[5] for c in candles[1:11]]
+                    if vols:
+                        return key, sum(vols) / len(vols)
+            elif res.status_code == 429:
+                time.sleep(0.25)  # Backoff on rate limit
+        except Exception:
+            pass
     return key, 0.0
 
 @st.cache_data(ttl=86400)
-def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
+def fetch_10d_avg_volumes_throttled(instrument_keys, access_token):
     today = datetime.now(IST)
     from_date = (today - timedelta(days=20)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
     
     avg_volumes = {}
-    with ThreadPoolExecutor(max_workers=15) as executor:
+    # Lower concurrency to 4 workers to eliminate startup HTTP 429
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(_fetch_single_10d_vol, key, access_token, to_date, from_date)
             for key in instrument_keys
@@ -97,34 +102,42 @@ def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
             
     return avg_volumes
 
-def fetch_live_quotes_parallel(instrument_keys, access_token):
+def fetch_live_quotes_safe(instrument_keys, access_token):
+    """Fetches market quotes in batches of 250 keys to eliminate HTTP 429."""
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     url = "https://api.upstox.com/v2/market-quote/quotes"
-    batch_size = 50
+    
+    # Batch size of 250 keys per GET request
+    batch_size = 250
     batches = [instrument_keys[i:i + batch_size] for i in range(0, len(instrument_keys), batch_size)]
     
     quotes_data = {}
     last_error = None
 
-    def fetch_batch(chunk):
+    for idx, chunk in enumerate(batches):
         keys_param = ",".join(chunk)
         try:
             encoded_params = urllib.parse.urlencode({'instrument_key': keys_param}, safe=',|:')
             res = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=6)
+            
             if res.status_code == 200 and res.json().get('status') == 'success':
-                return res.json().get('data', {}), None
+                quotes_data.update(res.json().get('data', {}))
+            elif res.status_code == 429:
+                last_error = "HTTP 429 Rate Limit hit. Retrying after brief pause..."
+                time.sleep(0.5)
+                # Single Retry
+                res_retry = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=6)
+                if res_retry.status_code == 200:
+                    quotes_data.update(res_retry.json().get('data', {}))
+                else:
+                    last_error = f"HTTP {res_retry.status_code}: {res_retry.text}"
             else:
-                return {}, f"HTTP {res.status_code}: {res.text}"
+                last_error = f"HTTP {res.status_code}: {res.text}"
         except Exception as e:
-            return {}, str(e)
-
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        results = executor.map(fetch_batch, batches)
-        for data, err in results:
-            if data:
-                quotes_data.update(data)
-            if err:
-                last_error = err
+            last_error = str(e)
+            
+        if idx < len(batches) - 1:
+            time.sleep(0.15)  # Throttle between batches
 
     return quotes_data, last_error
 
@@ -227,7 +240,7 @@ st.title("⚡ Upstox F&O Institutional Sector Radar")
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
     unique_keys = mapped_df['instrument_key'].unique().tolist()
-    avg_10d_vols = fetch_10d_avg_volumes_parallel(unique_keys, ACCESS_TOKEN)
+    avg_10d_vols = fetch_10d_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
 
 @st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
 def dashboard_live_loop():
@@ -239,7 +252,7 @@ def dashboard_live_loop():
     else:
         st.warning(f"🔴 **MARKET CLOSED / FROZEN** — Showing final market data. Current time: {now_str}")
 
-    quotes, api_error = fetch_live_quotes_parallel(unique_keys, ACCESS_TOKEN)
+    quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
     data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
 
     if data_df.empty:
@@ -282,11 +295,6 @@ def dashboard_live_loop():
             display_text=r"symbol=NSE:([^&]+)"
         )
     }
-
-    display_cols = [
-        'CHART_URL', 'SECTOR', 'LTP (₹)', 'CHANGE_STR', 
-        'VWAP_DIST_STR', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'INST_SCORE'
-    ]
 
     # --- Deduplicate Stocks for Top 10 Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
