@@ -21,14 +21,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
 
+# Retrieve token from secrets or fallback to default
 ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YTMwY2UxNTY4ODI0Zjc3ZDc1NmU3NjgiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc4MTU4MzM4MSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODEzMTgzMjAwfQ.IoRDQhbhcn3w9Fkw75N3eBSamLcaA8GcAhVjf5K-iL8")
-REFRESH_INTERVAL_SECONDS = 3
+REFRESH_INTERVAL_SECONDS = 5
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
 # File Existence Guard
 if not os.path.exists(FNO_EXCEL_PATH) or not os.path.exists(INSTRUMENTS_CSV_PATH):
     st.error("⚠️ **Required Data Files Missing!**")
+    st.info(f"Looking in folder: `{BASE_DIR}`")
     st.stop()
 
 # ==========================================
@@ -46,12 +48,11 @@ def load_instrument_mapping(excel_path, csv_path):
     return merged.drop_duplicates(subset=['SYMBOL', 'SECTOR']).reset_index(drop=True)
 
 def _fetch_single_10d_vol(key, access_token, to_date, from_date):
-    """Helper worker function for multithreaded volume fetching."""
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
-    encoded_key = urllib.parse.quote(key)
+    encoded_key = urllib.parse.quote(key, safe='|:')
     url = f"https://api.upstox.com/v2/historical-candle/{encoded_key}/day/{to_date}/{from_date}"
     try:
-        res = requests.get(url, headers=headers, timeout=3)
+        res = requests.get(url, headers=headers, timeout=4)
         if res.status_code == 200:
             candles = res.json().get('data', {}).get('candles', [])
             if candles:
@@ -69,8 +70,7 @@ def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
     to_date = today.strftime("%Y-%m-%d")
     
     avg_volumes = {}
-    # Fetch 20 stocks at a time in parallel threads
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=15) as executor:
         futures = [
             executor.submit(_fetch_single_10d_vol, key, access_token, to_date, from_date)
             for key in instrument_keys
@@ -84,44 +84,63 @@ def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
 def fetch_live_quotes_parallel(instrument_keys, access_token):
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     url = "https://api.upstox.com/v2/market-quote/quotes"
-    batch_size = 100
+    batch_size = 50  # Upstox recommended batch size
     batches = [instrument_keys[i:i + batch_size] for i in range(0, len(instrument_keys), batch_size)]
+    
     quotes_data = {}
+    last_error = None
 
     def fetch_batch(chunk):
         keys_param = ",".join(chunk)
         try:
-            encoded_params = urllib.parse.urlencode({'instrument_key': keys_param}, safe=',')
-            res = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=5)
+            encoded_params = urllib.parse.urlencode({'instrument_key': keys_param}, safe=',|:')
+            res = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=6)
             if res.status_code == 200 and res.json().get('status') == 'success':
-                return res.json().get('data', {})
-        except Exception:
-            pass
-        return {}
+                return res.json().get('data', {}), None
+            else:
+                return {}, f"HTTP {res.status_code}: {res.text}"
+        except Exception as e:
+            return {}, str(e)
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         results = executor.map(fetch_batch, batches)
-        for data in results:
-            quotes_data.update(data)
+        for data, err in results:
+            if data:
+                quotes_data.update(data)
+            if err:
+                last_error = err
 
-    return quotes_data
+    return quotes_data, last_error
 
 def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
     records = []
     if not quotes_dict:
         return pd.DataFrame()
 
+    # Pre-index normalized lookup keys
     normalized_quotes = {}
     for k, v in quotes_dict.items():
         normalized_quotes[k] = v
         normalized_quotes[k.replace(':', '|')] = v
         normalized_quotes[k.replace('|', ':')] = v
+        # Extract trading symbol suffix if present
+        if ':' in k:
+            normalized_quotes[k.split(':')[1]] = v
+        if '|' in k:
+            normalized_quotes[k.split('|')[1]] = v
 
     for _, row in mapped_df.iterrows():
         key = row['instrument_key']
         symbol = row['SYMBOL']
         sector = row['SECTOR']
-        quote = normalized_quotes.get(key) or normalized_quotes.get(symbol) or {}
+        
+        quote = (
+            normalized_quotes.get(key) 
+            or normalized_quotes.get(symbol) 
+            or normalized_quotes.get(f"NSE_EQ:{symbol}")
+            or normalized_quotes.get(f"NSE_EQ|{symbol}")
+            or {}
+        )
         if not quote:
             continue
             
@@ -182,11 +201,15 @@ def dashboard_live_loop():
     else:
         st.warning(f"🔴 **MARKET CLOSED / FROZEN** — Showing final data as of cutoff time. Current time: {now_str}")
 
-    quotes = fetch_live_quotes_parallel(unique_keys, ACCESS_TOKEN)
+    quotes, api_error = fetch_live_quotes_parallel(unique_keys, ACCESS_TOKEN)
     data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
 
     if data_df.empty:
-        st.error("Failed to receive live market quotes. Check your Upstox ACCESS_TOKEN in Secrets.")
+        st.error("⚠️ **Unable to load live quotes from Upstox API.**")
+        if api_error:
+            if "401" in api_error or "Unauthorized" in api_error:
+                st.error("🔑 **Access Token Expired**: Upstox tokens expire daily at 3:30 AM. Please generate a new `ACCESS_TOKEN` in Secrets.")
+            st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
         return
 
     # --- Sector Summary Table ---
