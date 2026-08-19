@@ -1,9 +1,9 @@
 import os
 import time
-import csv
 import urllib.parse
 from datetime import datetime, timedelta
 import zoneinfo
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import requests
 import streamlit as st
@@ -17,7 +17,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Dynamic path resolution to handle cloud directory structures
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
@@ -27,20 +26,13 @@ REFRESH_INTERVAL_SECONDS = 3
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
-# ==========================================
-# FILE EXISTENCE GUARDRAIL
-# ==========================================
+# File Existence Guard
 if not os.path.exists(FNO_EXCEL_PATH) or not os.path.exists(INSTRUMENTS_CSV_PATH):
     st.error("⚠️ **Required Data Files Missing!**")
-    st.info(
-        f"Looking for files in: `{BASE_DIR}`\n\n"
-        f"- `FNO all list.xlsx`: {'Found' if os.path.exists(FNO_EXCEL_PATH) else 'MISSING'}\n"
-        f"- `instruments.csv`: {'Found' if os.path.exists(INSTRUMENTS_CSV_PATH) else 'MISSING'}"
-    )
     st.stop()
 
 # ==========================================
-# 1. HELPER FUNCTIONS & DATA FETCHING
+# 1. OPTIMIZED DATA LOADING & FETCHING
 # ==========================================
 @st.cache_data(ttl=86400)
 def load_instrument_mapping(excel_path, csv_path):
@@ -53,47 +45,65 @@ def load_instrument_mapping(excel_path, csv_path):
     merged = pd.merge(fno_clean, nse_eq, left_on='SYMBOL', right_on='trading_symbol', how='inner')
     return merged.drop_duplicates(subset=['SYMBOL', 'SECTOR']).reset_index(drop=True)
 
-@st.cache_data(ttl=86400)
-def fetch_10d_avg_volumes(instrument_keys, access_token):
+def _fetch_single_10d_vol(key, access_token, to_date, from_date):
+    """Helper worker function for multithreaded volume fetching."""
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
+    encoded_key = urllib.parse.quote(key)
+    url = f"https://api.upstox.com/v2/historical-candle/{encoded_key}/day/{to_date}/{from_date}"
+    try:
+        res = requests.get(url, headers=headers, timeout=3)
+        if res.status_code == 200:
+            candles = res.json().get('data', {}).get('candles', [])
+            if candles:
+                vols = [c[5] for c in candles[1:11]]
+                if vols:
+                    return key, sum(vols) / len(vols)
+    except Exception:
+        pass
+    return key, 1.0
+
+@st.cache_data(ttl=86400)
+def fetch_10d_avg_volumes_parallel(instrument_keys, access_token):
     today = datetime.now(IST)
     from_date = (today - timedelta(days=20)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
     
     avg_volumes = {}
-    for key in instrument_keys:
-        encoded_key = urllib.parse.quote(key)
-        url = f"https://api.upstox.com/v2/historical-candle/{encoded_key}/day/{to_date}/{from_date}"
-        try:
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                candles = res.json().get('data', {}).get('candles', [])
-                if candles:
-                    volumes = [c[5] for c in candles[1:11]]
-                    if volumes:
-                        avg_volumes[key] = sum(volumes) / len(volumes)
-                        continue
-        except Exception:
-            pass
-        avg_volumes[key] = 1.0
+    # Fetch 20 stocks at a time in parallel threads
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [
+            executor.submit(_fetch_single_10d_vol, key, access_token, to_date, from_date)
+            for key in instrument_keys
+        ]
+        for future in as_completed(futures):
+            key, vol = future.result()
+            avg_volumes[key] = vol
+            
     return avg_volumes
 
-def fetch_live_quotes(instrument_keys, access_token):
+def fetch_live_quotes_parallel(instrument_keys, access_token):
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     url = "https://api.upstox.com/v2/market-quote/quotes"
     batch_size = 100
+    batches = [instrument_keys[i:i + batch_size] for i in range(0, len(instrument_keys), batch_size)]
     quotes_data = {}
-    
-    for i in range(0, len(instrument_keys), batch_size):
-        chunk = instrument_keys[i:i + batch_size]
+
+    def fetch_batch(chunk):
         keys_param = ",".join(chunk)
         try:
             encoded_params = urllib.parse.urlencode({'instrument_key': keys_param}, safe=',')
-            response = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=10)
-            if response.status_code == 200 and response.json().get('status') == 'success':
-                quotes_data.update(response.json().get('data', {}))
+            res = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=5)
+            if res.status_code == 200 and res.json().get('status') == 'success':
+                return res.json().get('data', {})
         except Exception:
             pass
+        return {}
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = executor.map(fetch_batch, batches)
+        for data in results:
+            quotes_data.update(data)
+
     return quotes_data
 
 def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
@@ -142,13 +152,12 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
     return pd.DataFrame(records)
 
 # ==========================================
-# 2. TIME CHECK CONTROL
+# 2. TIME CONTROL
 # ==========================================
 def is_market_open():
     now = datetime.now(IST)
     if now.weekday() >= 5:
         return False
-    
     start_time = now.replace(hour=9, minute=14, second=0, microsecond=0)
     end_time = now.replace(hour=15, minute=14, second=0, microsecond=0)
     return start_time <= now <= end_time
@@ -158,9 +167,10 @@ def is_market_open():
 # ==========================================
 st.title("⚡ Upstox F&O Institutional Sector Radar")
 
-mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
-unique_keys = mapped_df['instrument_key'].unique().tolist()
-avg_10d_vols = fetch_10d_avg_volumes(unique_keys, ACCESS_TOKEN)
+with st.spinner("Initializing Market Mapping & Historical Volumes..."):
+    mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
+    unique_keys = mapped_df['instrument_key'].unique().tolist()
+    avg_10d_vols = fetch_10d_avg_volumes_parallel(unique_keys, ACCESS_TOKEN)
 
 @st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
 def dashboard_live_loop():
@@ -172,11 +182,11 @@ def dashboard_live_loop():
     else:
         st.warning(f"🔴 **MARKET CLOSED / FROZEN** — Showing final data as of cutoff time. Current time: {now_str}")
 
-    quotes = fetch_live_quotes(unique_keys, ACCESS_TOKEN)
+    quotes = fetch_live_quotes_parallel(unique_keys, ACCESS_TOKEN)
     data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
 
     if data_df.empty:
-        st.info("Waiting for market quotes...")
+        st.error("Failed to receive live market quotes. Check your Upstox ACCESS_TOKEN in Secrets.")
         return
 
     # --- Sector Summary Table ---
