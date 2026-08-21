@@ -12,7 +12,7 @@ import streamlit as st
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Upstox F&O Institutional Sector Radar",
+    page_title="F&O Institutional Sector Radar",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
