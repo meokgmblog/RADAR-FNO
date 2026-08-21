@@ -21,8 +21,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
 
-ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YTMwY2UxNTY4ODI0Zjc3ZDc1NmU3NjgiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc4MTU4MzM4MSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODEzMTgzMjAwfQ.IoRDQhbhcn3w9Fkw75N3eBSamLcaA8GcAhVjf5K-iL8")
-REFRESH_INTERVAL_SECONDS = 30  # Increased to 10s to stay safely under 429 rate limits
+ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "YOUR_UPSTOX_ACCESS_TOKEN_HERE")
+REFRESH_INTERVAL_SECONDS = 30 
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
@@ -76,7 +76,7 @@ def _fetch_single_10d_vol(key, access_token, to_date, from_date):
                     if vols:
                         return key, sum(vols) / len(vols)
             elif res.status_code == 429:
-                time.sleep(0.25)  # Backoff on rate limit
+                time.sleep(0.25)
         except Exception:
             pass
     return key, 0.0
@@ -88,7 +88,6 @@ def fetch_10d_avg_volumes_throttled(instrument_keys, access_token):
     to_date = today.strftime("%Y-%m-%d")
     
     avg_volumes = {}
-    # Lower concurrency to 4 workers to eliminate startup HTTP 429
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(_fetch_single_10d_vol, key, access_token, to_date, from_date)
@@ -103,11 +102,9 @@ def fetch_10d_avg_volumes_throttled(instrument_keys, access_token):
     return avg_volumes
 
 def fetch_live_quotes_safe(instrument_keys, access_token):
-    """Fetches market quotes in batches of 250 keys to eliminate HTTP 429."""
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     url = "https://api.upstox.com/v2/market-quote/quotes"
     
-    # Batch size of 250 keys per GET request
     batch_size = 250
     batches = [instrument_keys[i:i + batch_size] for i in range(0, len(instrument_keys), batch_size)]
     
@@ -125,7 +122,6 @@ def fetch_live_quotes_safe(instrument_keys, access_token):
             elif res.status_code == 429:
                 last_error = "HTTP 429 Rate Limit hit. Retrying after brief pause..."
                 time.sleep(0.5)
-                # Single Retry
                 res_retry = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=6)
                 if res_retry.status_code == 200:
                     quotes_data.update(res_retry.json().get('data', {}))
@@ -137,7 +133,7 @@ def fetch_live_quotes_safe(instrument_keys, access_token):
             last_error = str(e)
             
         if idx < len(batches) - 1:
-            time.sleep(0.15)  # Throttle between batches
+            time.sleep(0.15)
 
     return quotes_data, last_error
 
@@ -245,19 +241,46 @@ with st.spinner("Initializing Market Mapping & Historical Volumes..."):
 @st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
 def dashboard_live_loop():
     market_status = is_market_open()
-    now_str = datetime.now(IST).strftime("%H:%M:%S IST")
+    now = datetime.now(IST)
+    now_str = now.strftime("%H:%M:%S IST")
+    today_str = now.strftime("%Y-%m-%d")
+
+    # Reset cache if a new trading day starts
+    if 'frozen_date' in st.session_state and st.session_state['frozen_date'] != today_str:
+        st.session_state.pop('frozen_df', None)
+        st.session_state.pop('frozen_time', None)
+        st.session_state.pop('frozen_date', None)
 
     if market_status:
         st.success(f"🟢 **MARKET LIVE** — Last Updated: {now_str}")
+        quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
+        data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+        
+        # Continuously hold the latest market data in memory
+        if not data_df.empty:
+            st.session_state['frozen_df'] = data_df
+            st.session_state['frozen_time'] = now_str
+            st.session_state['frozen_date'] = today_str
     else:
-        st.warning(f"🔴 **MARKET CLOSED / FROZEN** — Showing final market data. Current time: {now_str}")
-
-    quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-    data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+        # Market is CLOSED (After 3:13 PM or Before 9:14 AM / Weekends)
+        if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
+            data_df = st.session_state['frozen_df']
+            frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
+            st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
+            api_error = None
+        else:
+            # First load after 3:13 PM (fetch once to freeze final state)
+            st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
+            quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
+            data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+            if not data_df.empty:
+                st.session_state['frozen_df'] = data_df
+                st.session_state['frozen_time'] = now_str
+                st.session_state['frozen_date'] = today_str
 
     if data_df.empty:
         st.error("⚠️ **Unable to load live quotes from Upstox API.**")
-        if api_error:
+        if 'api_error' in locals() and api_error:
             st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
         return
 
