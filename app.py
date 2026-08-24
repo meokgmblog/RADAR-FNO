@@ -12,7 +12,7 @@ import streamlit as st
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title=" F&O Institutional Sector Radar",
+    page_title="F&O Institutional Sector Radar",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -231,7 +231,7 @@ def is_market_open():
 # ==========================================
 # 3. STREAMLIT RENDER LOGIC
 # ==========================================
-st.title("⚡ Upstox F&O Institutional Sector Radar")
+st.title("⚡F&O Institutional Sector Radar")
 
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
