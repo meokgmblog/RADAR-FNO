@@ -319,13 +319,33 @@ def dashboard_live_loop():
         )
     }
 
-    # --- Deduplicate Stocks for Top 10 Leaders ---
+    # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
+
+    # --- Display Count Selection ---
+    display_option = st.selectbox(
+        "Select Number of Stocks to Display:",
+        options=["Top 10", "Top 20", "All"],
+        index=0
+    )
+
+    if display_option == "Top 10":
+        top_n = 10
+        label_prefix = "Top 10"
+    elif display_option == "Top 20":
+        top_n = 20
+        label_prefix = "Top 20"
+    else:
+        top_n = None
+        label_prefix = "All"
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Top 10 Bullish Momentum Leaders")
-        bullish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=False).head(10).copy()
+        st.subheader(f"{label_prefix} Bullish Momentum Leaders")
+        bullish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=False)
+        if top_n is not None:
+            bullish = bullish.head(top_n)
+        bullish = bullish.copy()
         bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
         st.dataframe(
@@ -336,8 +356,11 @@ def dashboard_live_loop():
         )
 
     with col2:
-        st.subheader("Top 10 Bearish Short Setups")
-        bearish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=True).head(10).copy()
+        st.subheader(f"{label_prefix} Bearish Short Setups")
+        bearish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=True)
+        if top_n is not None:
+            bearish = bearish.head(top_n)
+        bearish = bearish.copy()
         bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
         st.dataframe(
