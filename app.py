@@ -21,7 +21,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
 
-ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiJ2YTMwY2UxNTY4ODI0Zjc3ZDc1NmU3NjgiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc4MTU4MzM4MSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODEzMTgzMjAwfQ.IoRDQhbhcn3w9Fkw75N3eBSamLcaA8GcAhVjf5K-iL8")
+ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YTMwY2UxNTY4ODI0Zjc3ZDc1NmU3NjgiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc4MTU4MzM4MSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODEzMTgzMjAwfQ.IoRDQhbhcn3w9Fkw75N3eBSamLcaA8GcAhVjf5K-iL8")
 REFRESH_INTERVAL_SECONDS = 30 
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
@@ -48,7 +48,7 @@ def format_signed_pct(val):
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
 # ==========================================
-# 1. DATA LOADING & MAPPING
+# 1. DATA LOADING & RATE-LIMITED FETCHING
 # ==========================================
 @st.cache_data(ttl=86400)
 def load_instrument_mapping(excel_path, csv_path):
@@ -59,13 +59,7 @@ def load_instrument_mapping(excel_path, csv_path):
     nse_eq = inst_df[(inst_df['segment'] == 'NSE_EQ') & (inst_df['instrument_type'] == 'EQ')][['trading_symbol', 'instrument_key', 'name']]
     
     merged = pd.merge(fno_clean, nse_eq, left_on='SYMBOL', right_on='trading_symbol', how='inner')
-    
-    # Safely extract options if columns exist
-    fo_options = pd.DataFrame()
-    if 'segment' in inst_df.columns and 'instrument_type' in inst_df.columns:
-        fo_options = inst_df[(inst_df['segment'] == 'NSE_FO') & (inst_df['instrument_type'].isin(['CE', 'PE']))].copy()
-    
-    return merged.drop_duplicates(subset=['SYMBOL', 'SECTOR']).reset_index(drop=True), fo_options
+    return merged.drop_duplicates(subset=['SYMBOL', 'SECTOR']).reset_index(drop=True)
 
 def _fetch_single_10d_vol(key, access_token, to_date, from_date):
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
@@ -126,11 +120,15 @@ def fetch_live_quotes_safe(instrument_keys, access_token):
             if res.status_code == 200 and res.json().get('status') == 'success':
                 quotes_data.update(res.json().get('data', {}))
             elif res.status_code == 429:
-                last_error = "HTTP 429 Rate Limit hit. Retrying..."
+                last_error = "HTTP 429 Rate Limit hit. Retrying after brief pause..."
                 time.sleep(0.5)
                 res_retry = requests.get(f"{url}?{encoded_params}", headers=headers, timeout=6)
                 if res_retry.status_code == 200:
                     quotes_data.update(res_retry.json().get('data', {}))
+                else:
+                    last_error = f"HTTP {res_retry.status_code}: {res_retry.text}"
+            else:
+                last_error = f"HTTP {res.status_code}: {res.text}"
         except Exception as e:
             last_error = str(e)
             
@@ -139,56 +137,7 @@ def fetch_live_quotes_safe(instrument_keys, access_token):
 
     return quotes_data, last_error
 
-# ==========================================
-# 2. SAFE OPTION OI ACTIVITY SCORING
-# ==========================================
-def calculate_oi_activity_scores(mapped_df, fo_options_df, quotes_dict):
-    """
-    Safely computes an OI activity score with robust fallbacks.
-    """
-    oi_scores = {}
-    if fo_options_df.empty or 'name' not in fo_options_df.columns:
-        return oi_scores
-
-    symbol_set = set(mapped_df['SYMBOL'])
-    active_options = fo_options_df[fo_options_df['name'].isin(symbol_set)].copy()
-    
-    if active_options.empty:
-        return oi_scores
-
-    try:
-        for symbol, group in active_options.groupby('name'):
-            quote = quotes_dict.get(f"NSE_EQ:{symbol}") or quotes_dict.get(f"NSE_EQ|{symbol}") or {}
-            ltp = float(quote.get('last_price') or 0.0)
-            if ltp <= 0:
-                oi_scores[symbol] = 1.0
-                continue
-            
-            if 'strike_price' in group.columns:
-                near_strikes = group[(group['strike_price'] >= ltp * 0.97) & (group['strike_price'] <= ltp * 1.03)]
-                if near_strikes.empty:
-                    near_strikes = group.head(10)
-            else:
-                near_strikes = group.head(10)
-                
-            opt_keys = near_strikes['instrument_key'].tolist()[:8] if 'instrument_key' in near_strikes.columns else []
-            
-            total_oi_change_abs = 0.0
-            count = 0
-            for k in opt_keys:
-                opt_q = quotes_dict.get(k) or quotes_dict.get(k.replace('|', ':')) or quotes_dict.get(k.replace(':', '|')) or {}
-                oi_change = abs(float(opt_q.get('oi_change') or opt_q.get('net_change_oi') or 0.0))
-                total_oi_change_abs += oi_change
-                count += 1
-                
-            score = (total_oi_change_abs / count) if count > 0 else 0.0
-            oi_scores[symbol] = max(1.0, min(3.0, 1.0 + (score / 5000.0)))
-    except Exception:
-        pass  # Fallback gracefully if any unexpected schema quirk occurs
-        
-    return oi_scores
-
-def process_market_data(mapped_df, fo_options_df, quotes_dict, avg_10d_vol_dict):
+def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
     records = []
     if not quotes_dict:
         return pd.DataFrame()
@@ -202,9 +151,6 @@ def process_market_data(mapped_df, fo_options_df, quotes_dict, avg_10d_vol_dict)
             normalized_quotes[k.split(':')[1]] = v
         if '|' in k:
             normalized_quotes[k.split('|')[1]] = v
-
-    # Calculate OI activity multiplier scores safely
-    oi_activity_map = calculate_oi_activity_scores(mapped_df, fo_options_df, normalized_quotes)
 
     for _, row in mapped_df.iterrows():
         key = row['instrument_key']
@@ -248,10 +194,7 @@ def process_market_data(mapped_df, fo_options_df, quotes_dict, avg_10d_vol_dict)
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
         
-        # Incorporate Live OI Activity Score multiplier
-        oi_multiplier = oi_activity_map.get(symbol, 1.0)
-        
-        inst_score = (p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)) * oi_multiplier
+        inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)
 
         tv_url = f"https://www.tradingview.com/chart/?symbol=NSE:{symbol}&interval=5"
 
@@ -270,13 +213,12 @@ def process_market_data(mapped_df, fo_options_df, quotes_dict, avg_10d_vol_dict)
             'Vol / 10D Vol': f"{vol_ratio:.2f}x",
             'FLOW_RATIO_RAW': round(flow_ratio, 2),
             'Order Flow': f"{flow_ratio:.2f}x",
-            'OI Activity': f"{oi_multiplier:.2f}x",
             'INST_SCORE': round(inst_score, 2),
         })
     return pd.DataFrame(records)
 
 # ==========================================
-# 3. TIME CONTROL
+# 2. TIME CONTROL
 # ==========================================
 def is_market_open():
     now = datetime.now(IST)
@@ -287,12 +229,12 @@ def is_market_open():
     return start_time <= now <= end_time
 
 # ==========================================
-# 4. STREAMLIT RENDER LOGIC
+# 3. STREAMLIT RENDER LOGIC
 # ==========================================
 st.title("⚡F&O Institutional Sector Radar")
 
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
-    mapped_df, fo_options_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
+    mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
     unique_keys = mapped_df['instrument_key'].unique().tolist()
     avg_10d_vols = fetch_10d_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
 
@@ -303,6 +245,7 @@ def dashboard_live_loop():
     now_str = now.strftime("%H:%M:%S IST")
     today_str = now.strftime("%Y-%m-%d")
 
+    # Reset cache if a new trading day starts
     if 'frozen_date' in st.session_state and st.session_state['frozen_date'] != today_str:
         st.session_state.pop('frozen_df', None)
         st.session_state.pop('frozen_time', None)
@@ -311,22 +254,25 @@ def dashboard_live_loop():
     if market_status:
         st.success(f"🟢 **MARKET LIVE** — Last Updated: {now_str}")
         quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-        data_df = process_market_data(mapped_df, fo_options_df, quotes, avg_10d_vols)
+        data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
         
+        # Continuously hold the latest market data in memory
         if not data_df.empty:
             st.session_state['frozen_df'] = data_df
             st.session_state['frozen_time'] = now_str
             st.session_state['frozen_date'] = today_str
     else:
+        # Market is CLOSED (After 3:13 PM or Before 9:14 AM / Weekends)
         if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
             data_df = st.session_state['frozen_df']
             frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
             st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
             api_error = None
         else:
-            st.warning(f"🔴 **MARKET CLOSED** — Fetching final snapshot. Current time: {now_str}")
+            # First load after 3:13 PM (fetch once to freeze final state)
+            st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
             quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-            data_df = process_market_data(mapped_df, fo_options_df, quotes, avg_10d_vols)
+            data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
             if not data_df.empty:
                 st.session_state['frozen_df'] = data_df
                 st.session_state['frozen_time'] = now_str
@@ -364,6 +310,7 @@ def dashboard_live_loop():
     sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
     st.dataframe(sector_df, use_container_width=True, hide_index=True)
 
+    # --- Table Config for Interactive TradingView Chart Hyperlinks ---
     table_column_config = {
         "CHART_URL": st.column_config.LinkColumn(
             "Symbol",
@@ -372,8 +319,10 @@ def dashboard_live_loop():
         )
     }
 
+    # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
 
+    # --- Display Count Selection ---
     display_option = st.selectbox(
         "Select Number of Stocks to Display:",
         options=["Top 10", "Top 20", "All"],
@@ -398,7 +347,7 @@ def dashboard_live_loop():
             bullish = bullish.head(top_n)
         bullish = bullish.copy()
         bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'OI Activity', 'Inst. Score']
+        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
         st.dataframe(
             bullish[cols_bullish],
             column_config=table_column_config,
@@ -413,7 +362,7 @@ def dashboard_live_loop():
             bearish = bearish.head(top_n)
         bearish = bearish.copy()
         bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'OI Activity', 'Inst. Score']
+        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
         st.dataframe(
             bearish[cols_bearish],
             column_config=table_column_config,
