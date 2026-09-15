@@ -60,8 +60,10 @@ def load_instrument_mapping(excel_path, csv_path):
     
     merged = pd.merge(fno_clean, nse_eq, left_on='SYMBOL', right_on='trading_symbol', how='inner')
     
-    # Pre-extract option keys mapping for activity scoring
-    fo_options = inst_df[(inst_df['segment'] == 'NSE_FO') & (inst_df['instrument_type'].isin(['CE', 'PE']))].copy()
+    # Safely extract options if columns exist
+    fo_options = pd.DataFrame()
+    if 'segment' in inst_df.columns and 'instrument_type' in inst_df.columns:
+        fo_options = inst_df[(inst_df['segment'] == 'NSE_FO') & (inst_df['instrument_type'].isin(['CE', 'PE']))].copy()
     
     return merged.drop_duplicates(subset=['SYMBOL', 'SECTOR']).reset_index(drop=True), fo_options
 
@@ -138,47 +140,51 @@ def fetch_live_quotes_safe(instrument_keys, access_token):
     return quotes_data, last_error
 
 # ==========================================
-# 2. OPTION OI ACTIVITY SCORING (BATCH FETCH)
+# 2. SAFE OPTION OI ACTIVITY SCORING
 # ==========================================
 def calculate_oi_activity_scores(mapped_df, fo_options_df, quotes_dict):
     """
-    Scans near-ATM options for each symbol to compute an OI activity variance score.
+    Safely computes an OI activity score with robust fallbacks.
     """
     oi_scores = {}
-    # Extract subset of option keys for stocks currently mapped
+    if fo_options_df.empty or 'name' not in fo_options_df.columns:
+        return oi_scores
+
     symbol_set = set(mapped_df['SYMBOL'])
     active_options = fo_options_df[fo_options_df['name'].isin(symbol_set)].copy()
     
     if active_options.empty:
         return oi_scores
 
-    # Group options by symbol and find near-ATM contracts based on LTP proximity
-    for symbol, group in active_op_group if False else active_options.groupby('name'):
-        # Find underlying LTP from quotes
-        quote = quotes_dict.get(f"NSE_EQ:{symbol}") or quotes_dict.get(f"NSE_EQ|{symbol}") or {}
-        ltp = float(quote.get('last_price') or 0.0)
-        if ltp <= 0:
-            oi_scores[symbol] = 1.0
-            continue
-        
-        # Filter strikes close to LTP (± 3% range)
-        near_strikes = group[(group['strike_price'] >= ltp * 0.97) & (group['strike_price'] <= ltp * 1.03)]
-        if near_strikes.empty:
-            near_strikes = group.head(10) # Fallback
+    try:
+        for symbol, group in active_options.groupby('name'):
+            quote = quotes_dict.get(f"NSE_EQ:{symbol}") or quotes_dict.get(f"NSE_EQ|{symbol}") or {}
+            ltp = float(quote.get('last_price') or 0.0)
+            if ltp <= 0:
+                oi_scores[symbol] = 1.0
+                continue
             
-        opt_keys = near_strikes['instrument_key'].tolist()[:8] # Limit to top 8 near-ATM contracts per stock
-        
-        total_oi_change_abs = 0.0
-        count = 0
-        for k in opt_keys:
-            opt_q = quotes_dict.get(k) or quotes_dict.get(k.replace('|', ':')) or quotes_dict.get(k.replace(':', '|')) or {}
-            oi_change = abs(float(opt_q.get('oi_change') or opt_q.get('net_change_oi') or 0.0))
-            total_oi_change_abs += oi_change
-            count += 1
+            if 'strike_price' in group.columns:
+                near_strikes = group[(group['strike_price'] >= ltp * 0.97) & (group['strike_price'] <= ltp * 1.03)]
+                if near_strikes.empty:
+                    near_strikes = group.head(10)
+            else:
+                near_strikes = group.head(10)
+                
+            opt_keys = near_strikes['instrument_key'].tolist()[:8] if 'instrument_key' in near_strikes.columns else []
             
-        score = (total_oi_change_abs / count) if count > 0 else 0.0
-        # Normalize score into a multiplier factor (e.g., 1.0 to 3.0)
-        oi_scores[symbol] = max(1.0, min(3.0, 1.0 + (score / 5000.0)))
+            total_oi_change_abs = 0.0
+            count = 0
+            for k in opt_keys:
+                opt_q = quotes_dict.get(k) or quotes_dict.get(k.replace('|', ':')) or quotes_dict.get(k.replace(':', '|')) or {}
+                oi_change = abs(float(opt_q.get('oi_change') or opt_q.get('net_change_oi') or 0.0))
+                total_oi_change_abs += oi_change
+                count += 1
+                
+            score = (total_oi_change_abs / count) if count > 0 else 0.0
+            oi_scores[symbol] = max(1.0, min(3.0, 1.0 + (score / 5000.0)))
+    except Exception:
+        pass  # Fallback gracefully if any unexpected schema quirk occurs
         
     return oi_scores
 
@@ -197,7 +203,7 @@ def process_market_data(mapped_df, fo_options_df, quotes_dict, avg_10d_vol_dict)
         if '|' in k:
             normalized_quotes[k.split('|')[1]] = v
 
-    # Calculate OI activity multiplier scores
+    # Calculate OI activity multiplier scores safely
     oi_activity_map = calculate_oi_activity_scores(mapped_df, fo_options_df, normalized_quotes)
 
     for _, row in mapped_df.iterrows():
@@ -242,7 +248,7 @@ def process_market_data(mapped_df, fo_options_df, quotes_dict, avg_10d_vol_dict)
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
         
-        # Incorporate Live OI Activity Score as a multiplier to filter/rank position builders
+        # Incorporate Live OI Activity Score multiplier
         oi_multiplier = oi_activity_map.get(symbol, 1.0)
         
         inst_score = (p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)) * oi_multiplier
@@ -288,8 +294,6 @@ st.title("⚡F&O Institutional Sector Radar")
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df, fo_options_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
     unique_keys = mapped_df['instrument_key'].unique().tolist()
-    
-    # Also grab sample option keys to include in live quote batches if needed
     avg_10d_vols = fetch_10d_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
 
 @st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
