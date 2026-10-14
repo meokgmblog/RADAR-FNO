@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 
 # ==========================================
-# PAGE CONFIGURATION & PREMIUM CSS INJECTION
+# PAGE CONFIGURATION & CYBER-FINTECH UI
 # ==========================================
 st.set_page_config(
     page_title="F&O Institutional Sector Radar",
@@ -17,114 +17,213 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom Advanced UI Styling & Animations
+# Advanced Custom CSS, Glassmorphic Styling & Keyframe Animations
 st.markdown("""
 <style>
-    /* Import Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-    /* Global App Background & Font */
+    /* Futuristic Deep Space Background with Animated Grid Glow */
     .stApp {
-        background: radial-gradient(circle at 50% 0%, #0d1117 0%, #05070b 100%);
+        background-color: #030712;
+        background-image: 
+            radial-gradient(circle at 15% 15%, rgba(31, 111, 235, 0.08) 0%, transparent 40%),
+            radial-gradient(circle at 85% 85%, rgba(188, 140, 255, 0.06) 0%, transparent 40%),
+            linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
         font-family: 'Plus Jakarta Sans', sans-serif;
-        color: #e6edf3;
+        color: #f3f4f6;
     }
 
-    code, pre, .dataframe {
+    code, pre {
         font-family: 'JetBrains Mono', monospace !important;
     }
 
-    /* Smooth Fade-In Animation */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: translateY(0); }
+    /* Keyframe Animations */
+    @keyframes slideUpFade {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); }
+        50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.25); }
+        100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); }
     }
 
     .main .block-container {
-        animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
+        animation: slideUpFade 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        padding-top: 2.5rem;
+        padding-bottom: 4rem;
         max-width: 98%;
     }
 
-    /* Glassmorphism Containers & Cards */
-    div.stMarkdown, div.stDataFrame, div.stAlert {
-        animation: fadeIn 0.5s ease-out forwards;
-    }
-
-    /* Premium Headers */
+    /* Typography & Headers */
     h1 {
         font-weight: 800 !important;
         letter-spacing: -0.03em;
-        background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 50%, #bc8cff 100%);
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #c084fc 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 1.5rem !important;
+        text-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
     }
 
     h2, h3 {
         font-weight: 700 !important;
         letter-spacing: -0.02em;
-        color: #f0f6fc !important;
+        color: #f9fafb !important;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        padding-bottom: 0.5rem;
-        margin-top: 1.5rem !important;
+        padding-bottom: 0.75rem;
+        margin-top: 2rem !important;
         margin-bottom: 1rem !important;
     }
 
-    /* Success / Warning Banners Styling */
+    /* Status Banners */
     div.stAlert {
-        background: rgba(22, 27, 34, 0.7) !important;
-        backdrop-filter: blur(12px);
+        background: rgba(15, 23, 42, 0.75) !important;
+        backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px !important;
-        color: #f0f6fc !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        border-radius: 14px !important;
+        color: #f3f4f6 !important;
+        animation: pulseGlow 4s infinite ease-in-out;
     }
 
-    /* Enhanced Dataframe Tables Styling */
-    .stDataFrame {
-        background: rgba(13, 17, 23, 0.6);
-        backdrop-filter: blur(16px);
+    /* Custom Fintech Terminal Table Container */
+    .terminal-table-container {
+        background: rgba(11, 15, 25, 0.75);
+        backdrop-filter: blur(20px);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
+        border-radius: 16px;
         padding: 4px;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+        animation: slideUpFade 0.6s ease-out forwards;
         transition: all 0.3s ease;
     }
 
-    .stDataFrame:hover {
-        border-color: rgba(88, 166, 255, 0.3);
-        box-shadow: 0 16px 48px rgba(88, 166, 255, 0.1);
+    .terminal-table-container:hover {
+        border-color: rgba(96, 165, 250, 0.3);
+        box-shadow: 0 25px 60px rgba(59, 130, 246, 0.15);
     }
 
-    /* Selectbox & UI Controls */
+    /* Custom Table Styling */
+    .terminal-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .terminal-table th {
+        background: rgba(17, 24, 39, 0.95);
+        color: #9ca3af;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        padding: 12px 16px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .terminal-table td {
+        padding: 11px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        color: #e5e7eb;
+        transition: background 0.2s ease;
+    }
+
+    .terminal-table tbody tr:hover td {
+        background: rgba(59, 130, 246, 0.08);
+    }
+
+    /* Value Color Coding */
+    .val-positive {
+        color: #34d399 !important;
+        font-weight: 600;
+    }
+
+    .val-negative {
+        color: #f87171 !important;
+        font-weight: 600;
+    }
+
+    .badge-bullish {
+        background: rgba(52, 211, 153, 0.15);
+        color: #34d399;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid rgba(52, 211, 153, 0.3);
+    }
+
+    .badge-bearish {
+        background: rgba(248, 113, 113, 0.15);
+        color: #f87171;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid rgba(248, 113, 113, 0.3);
+    }
+
+    .badge-neutral {
+        background: rgba(156, 163, 175, 0.15);
+        color: #9ca3af;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid rgba(156, 163, 175, 0.3);
+    }
+
+    .symbol-link {
+        color: #60a5fa;
+        text-decoration: none;
+        font-weight: 700;
+        transition: color 0.2s;
+    }
+
+    .symbol-link:hover {
+        color: #93c5fd;
+        text-decoration: underline;
+    }
+
+    /* Selectbox Styling */
     div[data-baseweb="select"] > div {
-        background-color: rgba(22, 27, 34, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        border-radius: 10px !important;
-        color: #f0f6fc !important;
-        backdrop-filter: blur(8px);
+        background-color: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 12px !important;
+        color: #f3f4f6 !important;
+        backdrop-filter: blur(12px);
     }
 
     div[data-baseweb="select"] span {
-        color: #f0f6fc !important;
+        color: #f3f4f6 !important;
     }
 
     /* Scrollbars */
     ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
     }
     ::-webkit-scrollbar-track {
-        background: #0d1117;
+        background: #030712;
     }
     ::-webkit-scrollbar-thumb {
-        background: #30363d;
-        border-radius: 3px;
+        background: #1e293b;
+        border-radius: 4px;
+        border: 2px solid #030712;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #58a6ff;
+        background: #3b82f6;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -148,7 +247,6 @@ if not os.path.exists(FNO_EXCEL_PATH) or not os.path.exists(INSTRUMENTS_CSV_PATH
 # FORMATTING HELPERS
 # ==========================================
 def format_volume(vol):
-    """Formats raw volume into standard K/M units."""
     if vol >= 1_000_000:
         return f"{vol / 1_000_000:.2f}M"
     elif vol >= 1_000:
@@ -156,8 +254,78 @@ def format_volume(vol):
     return str(int(vol))
 
 def format_signed_pct(val):
-    """Formats percentage with explicit + / - signs."""
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
+
+def render_terminal_table(df, columns_to_show):
+    """Renders a gorgeous custom HTML/CSS fintech table with animations and color coding."""
+    if df.empty:
+        st.info("No data available to display.")
+        return
+
+    html = '<div class="terminal-table-container"><table class="terminal-table"><thead><tr>'
+    
+    # Header generation
+    display_cols = [c for c in columns_to_show if c in df.columns]
+    header_names = {
+        'CHART_URL': 'Symbol',
+        'SECTOR': 'Sector',
+        'LTP (₹)': 'LTP (₹)',
+        'Change %': 'Change %',
+        'VWAP Dist %': 'VWAP Dist %',
+        'Volume': 'Volume',
+        'Vol / 10D Vol': 'Vol / 10D Vol',
+        'Order Flow': 'Order Flow',
+        'Position Builder Score': 'Pos Builder Score',
+        'Inst. Score': 'Inst. Score',
+        'Sector': 'Sector',
+        'Avg Change %': 'Avg Change %',
+        'Adv/Dec': 'Adv/Dec',
+        'Breadth Ratio': 'Breadth Ratio',
+        'Avg Order Flow': 'Avg Order Flow',
+        'Top Stock': 'Top Stock',
+        'Sector Momentum': 'Sector Momentum'
+    }
+
+    for col in display_cols:
+        html += f"<th>{header_names.get(col, col)}</th>"
+    html += "</tr></thead><tbody>"
+
+    for _, row in df.iterrows():
+        html += "<tr>"
+        for col in display_cols:
+            val = row[col]
+            str_val = str(val)
+            
+            # Format Hyperlinks for Symbols
+            if col == 'CHART_URL':
+                symbol_name = row.get('SYMBOL', str_val)
+                url = str_val
+                cell_content = f'<a href="{url}" target="_blank" class="symbol-link">{symbol_name} ↗</a>'
+            # Color-code percentages and changes
+            elif any(k in col.lower() for k in ['change', 'dist']):
+                clean_val = str_val.replace('%', '').replace('+', '').strip()
+                try:
+                    f_val = float(clean_val)
+                    cls = "val-positive" if f_val > 0 else ("val-negative" if f_val < 0 else "")
+                    cell_content = f'<span class="{cls}">{str_val}</span>'
+                except:
+                    cell_content = str_val
+            # Momentum / Score Badges
+            elif col == 'Sector Momentum':
+                if str_val == 'BULLISH':
+                    cell_content = f'<span class="badge-bullish">{str_val}</span>'
+                elif str_val == 'BEARISH':
+                    cell_content = f'<span class="badge-bearish">{str_val}</span>'
+                else:
+                    cell_content = f'<span class="badge-neutral">{str_val}</span>'
+            else:
+                cell_content = str_val
+
+            html += f"<td>{cell_content}</td>"
+        html += "</tr>"
+    html += "</tbody></table></div>"
+    
+    st.markdown(html, unsafe_allow_html=True)
 
 # ==========================================
 # 1. DATA LOADING & RATE-LIMITED FETCHING
@@ -375,20 +543,17 @@ def dashboard_live_loop():
         quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
         data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
         
-        # Continuously hold the latest market data in memory
         if not data_df.empty:
             st.session_state['frozen_df'] = data_df
             st.session_state['frozen_time'] = now_str
             st.session_state['frozen_date'] = today_str
     else:
-        # Market is CLOSED (After 3:13 PM or Before 9:14 AM / Weekends)
         if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
             data_df = st.session_state['frozen_df']
             frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
             st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
             api_error = None
         else:
-            # First load after 3:13 PM (fetch once to freeze final state)
             st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
             quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
             data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
@@ -430,31 +595,17 @@ def dashboard_live_loop():
         })
     
     sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
-    st.dataframe(sector_df, use_container_width=True, hide_index=True)
-
-    # --- Table Config for Interactive TradingView Chart Hyperlinks ---
-    table_column_config = {
-        "CHART_URL": st.column_config.LinkColumn(
-            "Symbol",
-            help="Click symbol name to open TradingView chart",
-            display_text=r"symbol=NSE:([^&]+)"
-        )
-    }
+    render_terminal_table(sector_df, ['Sector', 'Avg Change %', 'Adv/Dec', 'Breadth Ratio', 'Avg Order Flow', 'Top Stock', 'Sector Momentum'])
 
     # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
 
-    # --- Active Position Builder Spotlight Table (Added as requested) ---
+    # --- Active Position Builder Spotlight Table ---
     st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
     active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
     cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
-    st.dataframe(
-        active_pb_df[cols_pb],
-        column_config=table_column_config,
-        use_container_width=True,
-        hide_index=True
-    )
+    render_terminal_table(active_pb_df, cols_pb)
 
     # --- Display Count Selection ---
     display_option = st.selectbox(
@@ -482,12 +633,7 @@ def dashboard_live_loop():
         bullish = bullish.copy()
         bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        st.dataframe(
-            bullish[cols_bullish],
-            column_config=table_column_config,
-            use_container_width=True,
-            hide_index=True
-        )
+        render_terminal_table(bullish, cols_bullish)
 
     with col2:
         st.subheader(f"{label_prefix} Bearish Short Setups")
@@ -497,11 +643,6 @@ def dashboard_live_loop():
         bearish = bearish.copy()
         bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        st.dataframe(
-            bearish[cols_bearish],
-            column_config=table_column_config,
-            use_container_width=True,
-            hide_index=True
-        )
+        render_terminal_table(bearish, cols_bearish)
 
 dashboard_live_loop()
