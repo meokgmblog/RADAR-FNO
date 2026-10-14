@@ -332,19 +332,17 @@ def dashboard_live_loop():
     # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
 
-    # --- Active Position Builder Spotlight Table (Centered & Aligned) ---
-    _, center_col, _ = st.columns([0.5, 9, 0.5])
-    with center_col:
-        st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
-        active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
-        active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
-        st.dataframe(
-            active_pb_df[cols_pb],
-            column_config=table_column_config,
-            use_container_width=True,
-            hide_index=True
-        )
+    # --- Active Position Builder Spotlight Table (Added as requested) ---
+    st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
+    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
+    active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+    cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
+    st.dataframe(
+        active_pb_df[cols_pb],
+        column_config=table_column_config,
+        use_container_width=True,
+        hide_index=True
+    )
 
     # --- Display Count Selection ---
     display_option = st.selectbox(
