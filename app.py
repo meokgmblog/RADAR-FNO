@@ -194,6 +194,7 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
         
+        # Position Builder Score derived from volume surge, absolute price change, and order flow imbalance
         position_builder_score = round(vol_ratio_capped * abs(p_change) * flow_ratio, 2)
         inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)
 
@@ -217,6 +218,7 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
             'POS_BUILDER_SCORE': position_builder_score,
             'INST_SCORE': round(inst_score, 2),
         })
+        
     df = pd.DataFrame(records)
     if not df.empty and 'POS_BUILDER_SCORE' not in df.columns:
         df['POS_BUILDER_SCORE'] = 0.0
@@ -250,7 +252,7 @@ def dashboard_live_loop():
     now_str = now.strftime("%H:%M:%S IST")
     today_str = now.strftime("%Y-%m-%d")
 
-    # Clear cached session state if date changed or if old cache format lacks required keys
+    # Reset cache if a new trading day starts
     if 'frozen_date' in st.session_state and st.session_state['frozen_date'] != today_str:
         st.session_state.pop('frozen_df', None)
         st.session_state.pop('frozen_time', None)
@@ -286,7 +288,6 @@ def dashboard_live_loop():
             st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
         return
 
-    # Safety check for column existence from stale session states
     if 'POS_BUILDER_SCORE' not in data_df.columns:
         data_df['POS_BUILDER_SCORE'] = 0.0
 
