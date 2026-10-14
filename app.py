@@ -194,8 +194,6 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
         
-        # Position Builder Score calculation
-        position_builder_score = round(vol_ratio_capped * abs(p_change) * flow_ratio, 2)
         inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)
 
         tv_url = f"https://www.tradingview.com/chart/?symbol=NSE:{symbol}&interval=5"
@@ -215,14 +213,9 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
             'Vol / 10D Vol': f"{vol_ratio:.2f}x",
             'FLOW_RATIO_RAW': round(flow_ratio, 2),
             'Order Flow': f"{flow_ratio:.2f}x",
-            'POS_BUILDER_SCORE': position_builder_score,
             'INST_SCORE': round(inst_score, 2),
         })
-        
-    df = pd.DataFrame(records)
-    if not df.empty and 'POS_BUILDER_SCORE' not in df.columns:
-        df['POS_BUILDER_SCORE'] = 0.0
-    return df
+    return pd.DataFrame(records)
 
 # ==========================================
 # 2. TIME CONTROL
@@ -291,9 +284,6 @@ def dashboard_live_loop():
             st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
         return
 
-    if 'POS_BUILDER_SCORE' not in data_df.columns:
-        data_df['POS_BUILDER_SCORE'] = 0.0
-
     # --- Sector Summary Table ---
     st.subheader("Sector Performance Breakdown")
     sector_stats = []
@@ -331,18 +321,6 @@ def dashboard_live_loop():
 
     # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
-
-    # --- Active Position Builder Spotlight Table (Added as requested) ---
-    st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
-    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
-    active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-    cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
-    st.dataframe(
-        active_pb_df[cols_pb],
-        column_config=table_column_config,
-        use_container_width=True,
-        hide_index=True
-    )
 
     # --- Display Count Selection ---
     display_option = st.selectbox(
