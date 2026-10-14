@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 
 # ==========================================
-# PAGE CONFIGURATION & 4K GLASSY UI
+# PAGE CONFIGURATION & ATELIER LUXURY UI
 # ==========================================
 st.set_page_config(
     page_title="F&O Institutional Sector Radar",
@@ -17,221 +17,211 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 4K Glassmorphism & High-End Fintech CSS
+# Atelier Champagne Gold & Matte Obsidian Styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-    /* Ultra-High-End 4K Radial Background */
+    /* Matte Obsidian & Brushed Titanium Background */
     .stApp {
-        background-color: #020617;
+        background-color: #060608;
         background-image: 
-            radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.12) 0%, transparent 45%),
-            radial-gradient(circle at 90% 90%, rgba(168, 85, 247, 0.1) 0%, transparent 45%),
-            radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.4) 0%, rgba(2, 6, 23, 0.9) 100%);
-        font-family: 'Outfit', sans-serif;
-        color: #f8fafc;
+            radial-gradient(circle at 50% 0%, rgba(223, 177, 91, 0.05) 0%, transparent 50%),
+            linear-gradient(180deg, #060608 0%, #030304 100%);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: #f4f4f5;
     }
 
     code, pre {
-        font-family: 'JetBrains Mono', monospace !important;
+        font-family: 'Space Grotesk', monospace !important;
     }
 
-    /* 4K Smooth Stagger Animation */
-    @keyframes glassEntrance {
-        0% { opacity: 0; transform: translateY(24px) scale(0.99); filter: blur(8px); }
-        100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
-    }
-
-    @keyframes ambientGlow {
-        0% { box-shadow: 0 0 30px rgba(14, 165, 233, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
-        50% { box-shadow: 0 0 50px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
-        100% { box-shadow: 0 0 30px rgba(14, 165, 233, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+    /* Sophisticated Entrance Animation */
+    @keyframes atelierFade {
+        0% { opacity: 0; transform: translateY(15px); }
+        100% { opacity: 1; transform: translateY(0); }
     }
 
     .main .block-container {
-        animation: glassEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation: atelierFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         padding-top: 2.5rem;
         padding-bottom: 4rem;
         max-width: 98%;
     }
 
-    /* Typography */
+    /* Luxury Editorial Typography */
     h1 {
-        font-weight: 800 !important;
-        letter-spacing: -0.035em;
-        background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #e879f9 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 1.5rem !important;
-        text-shadow: 0 0 60px rgba(56, 189, 248, 0.4);
+        font-family: 'Space Grotesk', sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.03em;
+        color: #ffffff !important;
+        border-bottom: 1px solid rgba(223, 177, 91, 0.2);
+        padding-bottom: 1rem;
+        margin-bottom: 2rem !important;
+        text-transform: uppercase;
+        font-size: 1.8rem;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    h1::after {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #dfb15b;
+        border-radius: 50%;
+        box-shadow: 0 0 12px #dfb15b;
     }
 
     h2, h3 {
-        font-weight: 700 !important;
-        letter-spacing: -0.02em;
-        color: #ffffff !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        padding-bottom: 0.75rem;
+        font-family: 'Space Grotesk', sans-serif !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.01em;
+        color: #f4f4f5 !important;
+        border-left: 3px solid #dfb15b;
+        padding-left: 12px;
         margin-top: 2.5rem !important;
         margin-bottom: 1.25rem !important;
+        font-size: 1.25rem;
     }
 
-    /* Frosted Status Banners */
+    /* Atelier Status Banners */
     div.stAlert {
-        background: rgba(15, 23, 42, 0.65) !important;
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 16px !important;
-        color: #f8fafc !important;
-        animation: ambientGlow 6s infinite ease-in-out;
+        background: rgba(14, 14, 18, 0.9) !important;
+        border: 1px solid rgba(223, 177, 91, 0.25) !important;
+        border-radius: 8px !important;
+        color: #f4f4f5 !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
-    /* 4K Glassy Table Container */
-    .glass-table-wrapper {
-        background: rgba(15, 23, 42, 0.55);
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 6px;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    /* Atelier Luxury Table Container */
+    .atelier-table-wrapper {
+        background: #0e0e12;
+        border: 1px solid rgba(223, 177, 91, 0.15);
+        border-radius: 12px;
+        padding: 2px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(223, 177, 91, 0.03);
         margin-bottom: 2rem;
         overflow-x: auto;
-        animation: glassEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: atelierFade 0.5s ease-out forwards;
     }
 
-    .glass-table-wrapper:hover {
-        border-color: rgba(56, 189, 248, 0.35);
-        box-shadow: 0 30px 80px rgba(14, 165, 233, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-        transform: translateY(-2px);
-    }
-
-    /* Table Typography & Layout */
-    .glass-table {
+    .atelier-table {
         width: 100%;
         border-collapse: collapse;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.85rem;
+        font-family: 'Space Grotesk', monospace;
+        font-size: 0.82rem;
         text-align: left;
         white-space: nowrap;
     }
 
-    .glass-table th {
-        background: rgba(30, 41, 59, 0.75);
-        color: #94a3b8;
+    .atelier-table th {
+        background: #141419;
+        color: #dfb15b;
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.72rem;
-        letter-spacing: 0.08em;
-        padding: 14px 18px;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(223, 177, 91, 0.2);
         position: sticky;
         top: 0;
         z-index: 10;
-        backdrop-filter: blur(10px);
     }
 
-    .glass-table td {
-        padding: 13px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        color: #e2e8f0;
-        transition: background 0.25s ease;
+    .atelier-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        color: #d4d4d8;
+        transition: background 0.2s ease;
     }
 
-    .glass-table tbody tr:hover td {
-        background: rgba(56, 189, 248, 0.06);
+    .atelier-table tbody tr:hover td {
+        background: rgba(223, 177, 91, 0.04);
+        color: #ffffff;
     }
 
-    /* Glass Badges & Highlights */
-    .cls-positive {
-        color: #4ade80 !important;
+    /* Typography Color Highlights */
+    .atelier-positive {
+        color: #34d399 !important;
         font-weight: 600;
-        text-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
     }
 
-    .cls-negative {
+    .atelier-negative {
         color: #f87171 !important;
         font-weight: 600;
-        text-shadow: 0 0 20px rgba(248, 113, 113, 0.3);
     }
 
-    .tag-bullish {
-        background: rgba(74, 222, 128, 0.12);
-        color: #4ade80;
-        padding: 5px 12px;
-        border-radius: 8px;
-        font-size: 0.75rem;
+    .atelier-badge-bullish {
+        background: rgba(52, 211, 153, 0.1);
+        color: #34d399;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(74, 222, 128, 0.25);
-        box-shadow: 0 0 15px rgba(74, 222, 128, 0.1);
+        border: 1px solid rgba(52, 211, 153, 0.25);
     }
 
-    .tag-bearish {
-        background: rgba(248, 113, 113, 0.12);
+    .atelier-badge-bearish {
+        background: rgba(248, 113, 113, 0.1);
         color: #f87171;
-        padding: 5px 12px;
-        border-radius: 8px;
-        font-size: 0.75rem;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 700;
         border: 1px solid rgba(248, 113, 113, 0.25);
-        box-shadow: 0 0 15px rgba(248, 113, 113, 0.1);
     }
 
-    .tag-neutral {
-        background: rgba(148, 163, 184, 0.12);
-        color: #94a3b8;
-        padding: 5px 12px;
-        border-radius: 8px;
-        font-size: 0.75rem;
+    .atelier-badge-neutral {
+        background: rgba(161, 161, 170, 0.1);
+        color: #a1a1aa;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(148, 163, 184, 0.25);
+        border: 1px solid rgba(161, 161, 170, 0.25);
     }
 
-    .symbol-hyperlink {
-        color: #38bdf8;
+    .atelier-symbol-link {
+        color: #dfb15b;
         text-decoration: none;
-        font-weight: 700;
-        transition: all 0.2s;
+        font-weight: 600;
+        transition: color 0.2s;
     }
 
-    .symbol-hyperlink:hover {
-        color: #7dd3fc;
-        text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    .atelier-symbol-link:hover {
+        color: #fcd34d;
         text-decoration: underline;
     }
 
-    /* Frosted Selectbox Controls */
+    /* Atelier Selectbox */
     div[data-baseweb="select"] > div {
-        background-color: rgba(15, 23, 42, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        border-radius: 14px !important;
-        color: #f8fafc !important;
-        backdrop-filter: blur(16px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        background-color: #0e0e12 !important;
+        border: 1px solid rgba(223, 177, 91, 0.3) !important;
+        border-radius: 8px !important;
+        color: #f4f4f5 !important;
     }
 
     div[data-baseweb="select"] span {
-        color: #f8fafc !important;
+        color: #f4f4f5 !important;
     }
 
-    /* Custom 4K Scrollbar */
+    /* Scrollbars */
     ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
     }
     ::-webkit-scrollbar-track {
-        background: #020617;
+        background: #060608;
     }
     ::-webkit-scrollbar-thumb {
-        background: #1e293b;
-        border-radius: 4px;
-        border: 2px solid #020617;
+        background: #27272a;
+        border-radius: 3px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #38bdf8;
+        background: #dfb15b;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -264,13 +254,13 @@ def format_volume(vol):
 def format_signed_pct(val):
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
-def render_glass_table(df, columns_to_show):
-    """Renders a 4K glassy table with vivid color glow styling and smooth entrance animation."""
+def render_atelier_table(df, columns_to_show):
+    """Renders the Atelier luxury gold-trimmed table."""
     if df.empty:
         st.info("No data available to display.")
         return
 
-    html = '<div class="glass-table-wrapper"><table class="glass-table"><thead><tr>'
+    html = '<div class="atelier-table-wrapper"><table class="atelier-table"><thead><tr>'
     
     display_cols = [c for c in columns_to_show if c in df.columns]
     header_names = {
@@ -306,22 +296,22 @@ def render_glass_table(df, columns_to_show):
             if col == 'CHART_URL':
                 symbol_name = row.get('SYMBOL', str_val)
                 url = str_val
-                cell_content = f'<a href="{url}" target="_blank" class="symbol-hyperlink">{symbol_name} ↗</a>'
+                cell_content = f'<a href="{url}" target="_blank" class="atelier-symbol-link">{symbol_name} ↗</a>'
             elif any(k in col.lower() for k in ['change', 'dist']):
                 clean_val = str_val.replace('%', '').replace('+', '').strip()
                 try:
                     f_val = float(clean_val)
-                    cls = "cls-positive" if f_val > 0 else ("cls-negative" if f_val < 0 else "")
+                    cls = "atelier-positive" if f_val > 0 else ("atelier-negative" if f_val < 0 else "")
                     cell_content = f'<span class="{cls}">{str_val}</span>'
                 except:
                     cell_content = str_val
             elif col == 'Sector Momentum':
                 if str_val == 'BULLISH':
-                    cell_content = f'<span class="tag-bullish">{str_val}</span>'
+                    cell_content = f'<span class="atelier-badge-bullish">{str_val}</span>'
                 elif str_val == 'BEARISH':
-                    cell_content = f'<span class="tag-bearish">{str_val}</span>'
+                    cell_content = f'<span class="atelier-badge-bearish">{str_val}</span>'
                 else:
-                    cell_content = f'<span class="tag-neutral">{str_val}</span>'
+                    cell_content = f'<span class="atelier-badge-neutral">{str_val}</span>'
             else:
                 cell_content = str_val
 
@@ -522,7 +512,7 @@ def is_market_open():
 # ==========================================
 # 3. STREAMLIT RENDER LOGIC
 # ==========================================
-st.title("⚡F&O Institutional Sector Radar")
+st.title("F&O Institutional Sector Radar")
 
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
@@ -599,17 +589,17 @@ def dashboard_live_loop():
         })
     
     sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
-    render_glass_table(sector_df, ['Sector', 'Avg Change %', 'Adv/Dec', 'Breadth Ratio', 'Avg Order Flow', 'Top Stock', 'Sector Momentum'])
+    render_atelier_table(sector_df, ['Sector', 'Avg Change %', 'Adv/Dec', 'Breadth Ratio', 'Avg Order Flow', 'Top Stock', 'Sector Momentum'])
 
     # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
 
     # --- Active Position Builder Spotlight Table ---
-    st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
+    st.subheader("Active Position Builder Spotlight (High Conviction)")
     active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
     cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
-    render_glass_table(active_pb_df, cols_pb)
+    render_atelier_table(active_pb_df, cols_pb)
 
     # --- Display Count Selection ---
     display_option = st.selectbox(
@@ -637,7 +627,7 @@ def dashboard_live_loop():
         bullish = bullish.copy()
         bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        render_glass_table(bullish, cols_bullish)
+        render_atelier_table(bullish, cols_bullish)
 
     with col2:
         st.subheader(f"{label_prefix} Bearish Short Setups")
@@ -647,6 +637,6 @@ def dashboard_live_loop():
         bearish = bearish.copy()
         bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        render_glass_table(bearish, cols_bearish)
+        render_atelier_table(bearish, cols_bearish)
 
 dashboard_live_loop()
