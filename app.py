@@ -324,3 +324,184 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
             'VOLUME_RAW': int(volume),
             'Volume': format_volume(volume),
             'VOL_10D_RATIO_RAW': round(vol_ratio, 2),
+            'Vol / 10D Vol': f"{vol_ratio:.2f}x",
+            'FLOW_RATIO_RAW': round(flow_ratio, 2),
+            'Order Flow': f"{flow_ratio:.2f}x",
+            'POS_BUILDER_SCORE': position_builder_score,
+            'INST_SCORE': round(inst_score, 2),
+        })
+        
+    df = pd.DataFrame(records)
+    if not df.empty and 'POS_BUILDER_SCORE' not in df.columns:
+        df['POS_BUILDER_SCORE'] = 0.0
+    return df
+
+# ==========================================
+# 2. TIME CONTROL
+# ==========================================
+def is_market_open():
+    now = datetime.now(IST)
+    if now.weekday() >= 5:
+        return False
+    start_time = now.replace(hour=9, minute=14, second=0, microsecond=0)
+    end_time = now.replace(hour=15, minute=13, second=0, microsecond=0)
+    return start_time <= now <= end_time
+
+# ==========================================
+# 3. STREAMLIT RENDER LOGIC
+# ==========================================
+st.title("⚡F&O Institutional Sector Radar")
+
+with st.spinner("Initializing Market Mapping & Historical Volumes..."):
+    mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
+    unique_keys = mapped_df['instrument_key'].unique().tolist()
+    avg_10d_vols = fetch_10d_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
+
+@st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
+def dashboard_live_loop():
+    market_status = is_market_open()
+    now = datetime.now(IST)
+    now_str = now.strftime("%H:%M:%S IST")
+    today_str = now.strftime("%Y-%m-%d")
+
+    # Reset cache if a new trading day starts
+    if 'frozen_date' in st.session_state and st.session_state['frozen_date'] != today_str:
+        st.session_state.pop('frozen_df', None)
+        st.session_state.pop('frozen_time', None)
+        st.session_state.pop('frozen_date', None)
+
+    if market_status:
+        st.success(f"🟢 **MARKET LIVE** — Last Updated: {now_str}")
+        quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
+        data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+        
+        # Continuously hold the latest market data in memory
+        if not data_df.empty:
+            st.session_state['frozen_df'] = data_df
+            st.session_state['frozen_time'] = now_str
+            st.session_state['frozen_date'] = today_str
+    else:
+        # Market is CLOSED (After 3:13 PM or Before 9:14 AM / Weekends)
+        if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
+            data_df = st.session_state['frozen_df']
+            frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
+            st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
+            api_error = None
+        else:
+            # First load after 3:13 PM (fetch once to freeze final state)
+            st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
+            quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
+            data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+            if not data_df.empty:
+                st.session_state['frozen_df'] = data_df
+                st.session_state['frozen_time'] = now_str
+                st.session_state['frozen_date'] = today_str
+
+    if data_df.empty:
+        st.error("⚠️ **Unable to load live quotes from Upstox API.**")
+        if 'api_error' in locals() and api_error:
+            st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
+        return
+
+    if 'POS_BUILDER_SCORE' not in data_df.columns:
+        data_df['POS_BUILDER_SCORE'] = 0.0
+
+    # --- Sector Summary Table ---
+    st.subheader("Sector Performance Breakdown")
+    sector_stats = []
+    for sector, group in data_df.groupby('SECTOR'):
+        avg_chg = group['CHANGE_%'].mean()
+        advances = (group['CHANGE_%'] > 0).sum()
+        declines = (group['CHANGE_%'] < 0).sum()
+        total_stocks = len(group)
+        breadth_ratio = (advances - declines) / total_stocks if total_stocks > 0 else 0.0
+        top_stock = group.loc[group['INST_SCORE'].idxmax()]['SYMBOL'] if not group.empty else "N/A"
+        sector_score = avg_chg + (0.75 * breadth_ratio)
+        
+        sector_stats.append({
+            "Sector": sector,
+            "Avg Change %": format_signed_pct(avg_chg),
+            "Adv/Dec": f"{advances}/{declines}",
+            "Breadth Ratio": f"{breadth_ratio:+.2f}",
+            "Avg Order Flow": f"{group['FLOW_RATIO_RAW'].mean():.2f}x",
+            "Top Stock": top_stock,
+            "Sector Momentum": "BULLISH" if sector_score > 0.3 else ("BEARISH" if sector_score < -0.3 else "NEUTRAL"),
+            "_SORT_CHG": avg_chg
+        })
+    
+    sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
+    st.dataframe(sector_df, use_container_width=True, hide_index=True)
+
+    # --- Table Config for Interactive TradingView Chart Hyperlinks ---
+    table_column_config = {
+        "CHART_URL": st.column_config.LinkColumn(
+            "Symbol",
+            help="Click symbol name to open TradingView chart",
+            display_text=r"symbol=NSE:([^&]+)"
+        )
+    }
+
+    # --- Deduplicate Stocks for Leaders ---
+    unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
+
+    # --- Active Position Builder Spotlight Table (Added as requested) ---
+    st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
+    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
+    active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+    cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
+    st.dataframe(
+        active_pb_df[cols_pb],
+        column_config=table_column_config,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # --- Display Count Selection ---
+    display_option = st.selectbox(
+        "Select Number of Stocks to Display:",
+        options=["Top 10", "Top 20", "All"],
+        index=0
+    )
+
+    if display_option == "Top 10":
+        top_n = 10
+        label_prefix = "Top 10"
+    elif display_option == "Top 20":
+        top_n = 20
+        label_prefix = "Top 20"
+    else:
+        top_n = None
+        label_prefix = "All"
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader(f"{label_prefix} Bullish Momentum Leaders")
+        bullish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=False)
+        if top_n is not None:
+            bullish = bullish.head(top_n)
+        bullish = bullish.copy()
+        bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
+        st.dataframe(
+            bullish[cols_bullish],
+            column_config=table_column_config,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with col2:
+        st.subheader(f"{label_prefix} Bearish Short Setups")
+        bearish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=True)
+        if top_n is not None:
+            bearish = bearish.head(top_n)
+        bearish = bearish.copy()
+        bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
+        st.dataframe(
+            bearish[cols_bearish],
+            column_config=table_column_config,
+            use_container_width=True,
+            hide_index=True
+        )
+
+dashboard_live_loop()
