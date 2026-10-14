@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 
 # ==========================================
-# PAGE CONFIGURATION & ULTRA-LUXURY UI
+# PAGE CONFIGURATION & TITANIUM QUARTZ UI
 # ==========================================
 st.set_page_config(
     page_title="F&O Institutional Sector Radar",
@@ -17,17 +17,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ultra-Luxury, Haute-Finance Obsidian & Champagne Gold Theme
+# Ultra-Luxury Titanium Quartz & Neo-Precision CSS
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 
-    /* Deep Obsidian & Micro-Starlight Canvas */
+    /* Titanium Quartz Luxury Background */
     .stApp {
-        background-color: #06080d;
+        background-color: #08090e;
         background-image: 
-            radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.05) 0%, transparent 50%),
-            radial-gradient(circle at 100% 100%, rgba(56, 189, 248, 0.03) 0%, transparent 40%);
+            radial-gradient(circle at 0% 0%, rgba(20, 184, 166, 0.07) 0%, transparent 50%),
+            radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.07) 0%, transparent 50%),
+            linear-gradient(180deg, #08090e 0%, #030407 100%);
         font-family: 'Plus Jakarta Sans', sans-serif;
         color: #f1f5f9;
     }
@@ -36,72 +37,68 @@ st.markdown("""
         font-family: 'Space Mono', monospace !important;
     }
 
-    /* Ultra-Smooth Luxury Entrance Animation */
-    @keyframes luxuryReveal {
-        0% { opacity: 0; transform: translateY(16px); filter: blur(4px); }
-        100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
+    /* Staggered Precision Entrance */
+    @keyframes quartzReveal {
+        0% { opacity: 0; transform: translateY(16px); }
+        100% { opacity: 1; transform: translateY(0); }
     }
 
     .main .block-container {
-        animation: luxuryReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        padding-top: 3rem;
-        padding-bottom: 5rem;
+        animation: quartzReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        padding-top: 2.5rem;
+        padding-bottom: 4rem;
         max-width: 98%;
     }
 
-    /* Champagne Gold Gradient Headers */
+    /* Executive Typography */
     h1 {
-        font-weight: 700 !important;
+        font-weight: 800 !important;
         letter-spacing: -0.04em;
-        background: linear-gradient(135deg, #ffffff 20%, #e2b714 60%, #fff6bd 100%);
+        background: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 50%, #818cf8 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 1.75rem !important;
+        margin-bottom: 1.5rem !important;
     }
 
     h2, h3 {
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         letter-spacing: -0.02em;
         color: #f8fafc !important;
-        border-bottom: 1px solid rgba(212, 175, 55, 0.15);
-        padding-bottom: 0.85rem;
-        margin-top: 3rem !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 0.75rem;
+        margin-top: 2.5rem !important;
         margin-bottom: 1.25rem !important;
     }
 
-    /* Frosted Titanium Status Boxes */
+    /* Precision Status Banners */
     div.stAlert {
-        background: rgba(13, 17, 23, 0.8) !important;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(212, 175, 55, 0.2) !important;
+        background: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(45, 212, 191, 0.2) !important;
         border-radius: 12px !important;
         color: #f8fafc !important;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
-    /* Elite Floating Table Container */
-    .luxury-table-panel {
-        background: rgba(10, 14, 22, 0.65);
-        backdrop-filter: blur(25px);
-        -webkit-backdrop-filter: blur(25px);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+    /* Titanium Quartz Table Shell */
+    .quartz-table-shell {
+        background: rgba(13, 15, 23, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.07);
         border-radius: 16px;
         padding: 4px;
-        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(212, 175, 55, 0.1);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
         margin-bottom: 2rem;
         overflow-x: auto;
-        animation: luxuryReveal 0.8s ease-out forwards;
-        transition: all 0.4s ease;
+        animation: quartzReveal 0.5s ease-out forwards;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .luxury-table-panel:hover {
-        border-color: rgba(212, 175, 55, 0.35);
-        box-shadow: 0 35px 90px rgba(0, 0, 0, 0.9), 0 0 25px rgba(212, 175, 55, 0.05);
+    .quartz-table-shell:hover {
+        border-color: rgba(45, 212, 191, 0.3);
+        box-shadow: 0 25px 60px rgba(20, 184, 166, 0.12);
     }
 
-    /* Precision Financial Grid */
-    .luxury-grid {
+    /* Precision Table Styling */
+    .quartz-table {
         width: 100%;
         border-collapse: collapse;
         font-family: 'Space Mono', monospace;
@@ -110,111 +107,111 @@ st.markdown("""
         white-space: nowrap;
     }
 
-    .luxury-grid th {
-        background: rgba(18, 24, 38, 0.9);
+    .quartz-table th {
+        background: rgba(20, 24, 39, 0.95);
         color: #94a3b8;
-        font-weight: 500;
+        font-weight: 700;
         text-transform: uppercase;
         font-size: 0.7rem;
         letter-spacing: 0.1em;
-        padding: 15px 20px;
-        border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+        padding: 14px 16px;
+        border-bottom: 2px solid rgba(45, 212, 191, 0.2);
         position: sticky;
         top: 0;
         z-index: 10;
     }
 
-    .luxury-grid td {
-        padding: 14px 20px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    .quartz-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         color: #e2e8f0;
         transition: background 0.2s ease;
     }
 
-    .luxury-grid tbody tr:hover td {
-        background: rgba(212, 175, 55, 0.04);
+    .quartz-table tbody tr:hover td {
+        background: rgba(45, 212, 191, 0.05);
     }
 
-    /* Numeric Glow & Status Pills */
-    .price-up {
-        color: #34d399 !important;
-        font-weight: 600;
+    /* Luxury Value Highlighting */
+    .num-positive {
+        color: #2dd4bf !important;
+        font-weight: 700;
     }
 
-    .price-down {
+    .num-negative {
         color: #fb7185 !important;
-        font-weight: 600;
+        font-weight: 700;
     }
 
     .pill-bullish {
-        background: rgba(52, 211, 153, 0.1);
-        color: #34d399;
+        background: rgba(45, 212, 191, 0.12);
+        color: #2dd4bf;
         padding: 4px 10px;
         border-radius: 6px;
         font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(52, 211, 153, 0.25);
+        border: 1px solid rgba(45, 212, 191, 0.3);
     }
 
     .pill-bearish {
-        background: rgba(251, 113, 133, 0.1);
+        background: rgba(251, 113, 133, 0.12);
         color: #fb7185;
         padding: 4px 10px;
         border-radius: 6px;
         font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(251, 113, 133, 0.25);
+        border: 1px solid rgba(251, 113, 133, 0.3);
     }
 
     .pill-neutral {
-        background: rgba(148, 163, 184, 0.1);
+        background: rgba(148, 163, 184, 0.12);
         color: #94a3b8;
         padding: 4px 10px;
         border-radius: 6px;
         font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(148, 163, 184, 0.25);
+        border: 1px solid rgba(148, 163, 184, 0.3);
     }
 
-    .symbol-link-gold {
-        color: #facc15;
+    .link-symbol {
+        color: #38bdf8;
         text-decoration: none;
         font-weight: 700;
         transition: color 0.2s;
     }
 
-    .symbol-link-gold:hover {
-        color: #fde047;
+    .link-symbol:hover {
+        color: #7dd3fc;
         text-decoration: underline;
     }
 
-    /* Premium Dropdown Controls */
+    /* Custom Selectbox Controls */
     div[data-baseweb="select"] > div {
-        background-color: rgba(13, 17, 23, 0.85) !important;
-        border: 1px solid rgba(212, 175, 55, 0.25) !important;
+        background-color: rgba(13, 15, 23, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
         border-radius: 12px !important;
-        color: #f8fafc !important;
-        backdrop-filter: blur(16px);
+        color: #f1f5f9 !important;
     }
 
     div[data-baseweb="select"] span {
-        color: #f8fafc !important;
+        color: #f1f5f9 !important;
     }
 
-    /* Custom Minimal Scrollbar */
+    /* Custom Scrollbar */
     ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
     }
     ::-webkit-scrollbar-track {
-        background: #06080d;
+        background: #08090e;
     }
     ::-webkit-scrollbar-thumb {
         background: #1e293b;
-        border-radius: 3px;
+        border-radius: 4px;
+        border: 2px solid #08090e;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #d4af37;
+        background: #2dd4bf;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -247,13 +244,13 @@ def format_volume(vol):
 def format_signed_pct(val):
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
-def render_luxury_table(df, columns_to_show):
-    """Renders a high-end luxury obsidian-gold financial grid table."""
+def render_quartz_table(df, columns_to_show):
+    """Renders a precision Quartz-styled financial table."""
     if df.empty:
         st.info("No data available to display.")
         return
 
-    html = '<div class="luxury-table-panel"><table class="luxury-grid"><thead><tr>'
+    html = '<div class="quartz-table-shell"><table class="quartz-table"><thead><tr>'
     
     display_cols = [c for c in columns_to_show if c in df.columns]
     header_names = {
@@ -289,12 +286,12 @@ def render_luxury_table(df, columns_to_show):
             if col == 'CHART_URL':
                 symbol_name = row.get('SYMBOL', str_val)
                 url = str_val
-                cell_content = f'<a href="{url}" target="_blank" class="symbol-link-gold">{symbol_name} ↗</a>'
+                cell_content = f'<a href="{url}" target="_blank" class="link-symbol">{symbol_name} ↗</a>'
             elif any(k in col.lower() for k in ['change', 'dist']):
                 clean_val = str_val.replace('%', '').replace('+', '').strip()
                 try:
                     f_val = float(clean_val)
-                    cls = "price-up" if f_val > 0 else ("price-down" if f_val < 0 else "")
+                    cls = "num-positive" if f_val > 0 else ("num-negative" if f_val < 0 else "")
                     cell_content = f'<span class="{cls}">{str_val}</span>'
                 except:
                     cell_content = str_val
@@ -582,7 +579,7 @@ def dashboard_live_loop():
         })
     
     sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
-    render_luxury_table(sector_df, ['Sector', 'Avg Change %', 'Adv/Dec', 'Breadth Ratio', 'Avg Order Flow', 'Top Stock', 'Sector Momentum'])
+    render_quartz_table(sector_df, ['Sector', 'Avg Change %', 'Adv/Dec', 'Breadth Ratio', 'Avg Order Flow', 'Top Stock', 'Sector Momentum'])
 
     # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
@@ -592,7 +589,7 @@ def dashboard_live_loop():
     active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
     cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
-    render_luxury_table(active_pb_df, cols_pb)
+    render_quartz_table(active_pb_df, cols_pb)
 
     # --- Display Count Selection ---
     display_option = st.selectbox(
@@ -620,7 +617,7 @@ def dashboard_live_loop():
         bullish = bullish.copy()
         bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        render_luxury_table(bullish, cols_bullish)
+        render_quartz_table(bullish, cols_bullish)
 
     with col2:
         st.subheader(f"{label_prefix} Bearish Short Setups")
@@ -630,6 +627,6 @@ def dashboard_live_loop():
         bearish = bearish.copy()
         bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
         cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        render_luxury_table(bearish, cols_bearish)
+        render_quartz_table(bearish, cols_bearish)
 
 dashboard_live_loop()
