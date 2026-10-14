@@ -17,6 +17,137 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ==========================================
+# PREMIUM UI & ANIMATION STYLING (CSS)
+# ==========================================
+st.markdown("""
+<style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    /* Global Theme Overrides */
+    html, body, [class*="st"] {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    
+    .stApp {
+        background: radial-gradient(circle at 50% 0%, #111827 0%, #030712 100%);
+        color: #f3f4f6;
+    }
+
+    code, pre, .dataframe {
+        font-family: 'JetBrains Mono', monospace !important;
+    }
+
+    /* Animations */
+    @keyframes pulseGlow {
+        0% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-fade {
+        animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Hero Header Styling */
+    .hero-container {
+        background: linear-gradient(135deg, rgba(31, 41, 55, 0.7) 0%, rgba(17, 24, 39, 0.8) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 28px 36px;
+        margin-bottom: 24px;
+        backdrop-filter: blur(16px);
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
+
+    .hero-title {
+        font-size: 2.25rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #60a5fa 0%, #34d399 50%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0 0 8px 0;
+        letter-spacing: -0.02em;
+    }
+
+    .hero-subtitle {
+        color: #9ca3af;
+        font-size: 1rem;
+        font-weight: 500;
+        margin: 0;
+    }
+
+    /* Status Badges */
+    .status-badge-live {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(6, 78, 59, 0.6);
+        border: 1px solid rgba(52, 211, 153, 0.4);
+        color: #34d399;
+        padding: 6px 14px;
+        border-radius: 30px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        animation: pulseGlow 2s infinite;
+    }
+
+    .status-badge-closed {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(127, 29, 29, 0.5);
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        color: #f87171;
+        padding: 6px 14px;
+        border-radius: 30px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #34d399;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        box-shadow: 0 0 8px #34d399;
+    }
+
+    /* Section Subheaders */
+    h3 {
+        color: #f9fafb !important;
+        font-weight: 700 !important;
+        font-size: 1.35rem !important;
+        margin-top: 2rem !important;
+        margin-bottom: 1rem !important;
+        letter-spacing: -0.01em;
+        border-left: 4px solid #60a5fa;
+        padding-left: 12px;
+    }
+
+    /* Custom Cards / Containers */
+    .stDataFrame {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(17, 24, 39, 0.6);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Streamlit Selectbox & Widget Tweaks */
+    .stSelectbox label {
+        color: #d1d5db !important;
+        font-weight: 600 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FNO_EXCEL_PATH = os.path.join(BASE_DIR, "FNO all list.xlsx")
 INSTRUMENTS_CSV_PATH = os.path.join(BASE_DIR, "instruments.csv")
@@ -236,9 +367,14 @@ def is_market_open():
     return start_time <= now <= end_time
 
 # ==========================================
-# 3. STREAMLIT RENDER LOGIC
+# 3. STREAMLIT RENDER LOGIC (PREMIUM UI)
 # ==========================================
-st.title("⚡F&O Institutional Sector Radar")
+st.markdown("""
+    <div class="hero-container animate-fade">
+        <h1 class="hero-title">⚡ F&O Institutional Sector Radar</h1>
+        <p class="hero-subtitle">Real-time institutional flow tracking, sector momentum, and high-conviction position builder matrix.</p>
+    </div>
+""", unsafe_allow_html=True)
 
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
@@ -259,7 +395,13 @@ def dashboard_live_loop():
         st.session_state.pop('frozen_date', None)
 
     if market_status:
-        st.success(f"🟢 **MARKET LIVE** — Last Updated: {now_str}")
+        st.markdown(f"""
+            <div style="margin-bottom: 20px;">
+                <span class="status-badge-live">
+                    <span class="pulse-dot"></span> MARKET LIVE &nbsp;&bull;&nbsp; Last Updated: {now_str}
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
         quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
         data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
         
@@ -273,11 +415,23 @@ def dashboard_live_loop():
         if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
             data_df = st.session_state['frozen_df']
             frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
-            st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
+            st.markdown(f"""
+                <div style="margin-bottom: 20px;">
+                    <span class="status-badge-closed">
+                        🔴 MARKET CLOSED — FROZEN AT 3:13 PM (Locked at: {frozen_at})
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
             api_error = None
         else:
             # First load after 3:13 PM (fetch once to freeze final state)
-            st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
+            st.markdown(f"""
+                <div style="margin-bottom: 20px;">
+                    <span class="status-badge-closed">
+                        🔴 MARKET CLOSED — Fetching final snapshot ({now_str})
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
             quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
             data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
             if not data_df.empty:
@@ -332,7 +486,7 @@ def dashboard_live_loop():
     # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
 
-    # --- Active Position Builder Spotlight Table (Added as requested) ---
+    # --- Active Position Builder Spotlight Table ---
     st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
     active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
@@ -345,6 +499,7 @@ def dashboard_live_loop():
     )
 
     # --- Display Count Selection ---
+    st.markdown("<br>", unsafe_allow_html=True)
     display_option = st.selectbox(
         "Select Number of Stocks to Display:",
         options=["Top 10", "Top 20", "All"],
