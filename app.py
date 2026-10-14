@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 
 # ==========================================
-# PAGE CONFIGURATION & CYBER-OBSIDIAN UI
+# PAGE CONFIGURATION & ATELIER LUXURY UI
 # ==========================================
 st.set_page_config(
     page_title="F&O Institutional Sector Radar",
@@ -17,232 +17,211 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Cyber-Brutalist, Obsidian Glass & Neon Terminal Styling
+# Atelier Champagne Gold & Matte Obsidian Styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-    /* Deep Cyber Obsidian Background with Holographic Gradients */
+    /* Matte Obsidian & Brushed Titanium Background */
     .stApp {
-        background-color: #030305;
+        background-color: #060608;
         background-image: 
-            radial-gradient(circle at 15% 10%, rgba(16, 185, 129, 0.04) 0%, transparent 40%),
-            radial-gradient(circle at 85% 90%, rgba(99, 102, 241, 0.04) 0%, transparent 40%),
-            linear-gradient(180deg, #030305 0%, #010103 100%);
+            radial-gradient(circle at 50% 0%, rgba(223, 177, 91, 0.05) 0%, transparent 50%),
+            linear-gradient(180deg, #060608 0%, #030304 100%);
         font-family: 'Plus Jakarta Sans', sans-serif;
-        color: #f1f5f9;
+        color: #f4f4f5;
     }
 
     code, pre {
-        font-family: 'JetBrains Mono', monospace !important;
+        font-family: 'Space Grotesk', monospace !important;
     }
 
-    /* Terminal Fade-In Animation */
-    @keyframes cyberFadeIn {
-        0% { opacity: 0; transform: translateY(10px) scale(0.99); }
-        100% { opacity: 1; transform: translateY(0) scale(1); }
+    /* Sophisticated Entrance Animation */
+    @keyframes atelierFade {
+        0% { opacity: 0; transform: translateY(15px); }
+        100% { opacity: 1; transform: translateY(0); }
     }
 
     .main .block-container {
-        animation: cyberFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        padding-top: 2rem;
-        padding-bottom: 5rem;
+        animation: atelierFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        padding-top: 2.5rem;
+        padding-bottom: 4rem;
         max-width: 98%;
     }
 
-    /* High-Frequency Terminal Header Styling */
+    /* Luxury Editorial Typography */
     h1 {
-        font-family: 'JetBrains Mono', sans-serif !important;
+        font-family: 'Space Grotesk', sans-serif !important;
         font-weight: 700 !important;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.03em;
         color: #ffffff !important;
-        background: linear-gradient(90deg, #ffffff 0%, #94a3b8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        padding-bottom: 1.2rem;
+        border-bottom: 1px solid rgba(223, 177, 91, 0.2);
+        padding-bottom: 1rem;
         margin-bottom: 2rem !important;
-        font-size: 2rem;
+        text-transform: uppercase;
+        font-size: 1.8rem;
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 12px;
     }
 
     h1::after {
-        content: 'SYS.LIVE';
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.7rem;
-        background: rgba(16, 185, 129, 0.1);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        padding: 4px 10px;
-        border-radius: 4px;
-        letter-spacing: 0.1em;
-        -webkit-text-fill-color: #10b981;
-        box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #dfb15b;
+        border-radius: 50%;
+        box-shadow: 0 0 12px #dfb15b;
     }
 
     h2, h3 {
-        font-family: 'JetBrains Mono', sans-serif !important;
+        font-family: 'Space Grotesk', sans-serif !important;
         font-weight: 600 !important;
-        letter-spacing: -0.02em;
-        color: #f8fafc !important;
-        border-left: 3px solid #10b981;
-        padding-left: 14px;
+        letter-spacing: -0.01em;
+        color: #f4f4f5 !important;
+        border-left: 3px solid #dfb15b;
+        padding-left: 12px;
         margin-top: 2.5rem !important;
         margin-bottom: 1.25rem !important;
-        font-size: 1.15rem;
-        text-transform: uppercase;
+        font-size: 1.25rem;
     }
 
-    /* Glassmorphism Status Banners */
+    /* Atelier Status Banners */
     div.stAlert {
-        background: rgba(15, 23, 42, 0.7) !important;
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 10px !important;
-        color: #e2e8f0 !important;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+        background: rgba(14, 14, 18, 0.9) !important;
+        border: 1px solid rgba(223, 177, 91, 0.25) !important;
+        border-radius: 8px !important;
+        color: #f4f4f5 !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
-    /* Cyber-Glass Table Wrapper */
+    /* Atelier Luxury Table Container */
     .atelier-table-wrapper {
-        background: rgba(9, 9, 11, 0.85);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 14px;
-        padding: 4px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.84), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        background: #0e0e12;
+        border: 1px solid rgba(223, 177, 91, 0.15);
+        border-radius: 12px;
+        padding: 2px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(223, 177, 91, 0.03);
         margin-bottom: 2rem;
         overflow-x: auto;
-        animation: cyberFadeIn 0.4s ease-out forwards;
+        animation: atelierFade 0.5s ease-out forwards;
     }
 
     .atelier-table {
         width: 100%;
         border-collapse: collapse;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.8rem;
+        font-family: 'Space Grotesk', monospace;
+        font-size: 0.82rem;
         text-align: left;
         white-space: nowrap;
     }
 
     .atelier-table th {
-        background: rgba(24, 24, 27, 0.9);
-        color: #94a3b8;
+        background: #141419;
+        color: #dfb15b;
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.68rem;
-        letter-spacing: 0.12em;
-        padding: 14px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(223, 177, 91, 0.2);
         position: sticky;
         top: 0;
         z-index: 10;
     }
 
     .atelier-table td {
-        padding: 12px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-        color: #cbd5e1;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .atelier-table tbody tr {
-        transition: background-color 0.15s ease;
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        color: #d4d4d8;
+        transition: background 0.2s ease;
     }
 
     .atelier-table tbody tr:hover td {
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(223, 177, 91, 0.04);
         color: #ffffff;
     }
 
-    /* Dynamic Value Color Highlights */
+    /* Typography Color Highlights */
     .atelier-positive {
         color: #34d399 !important;
         font-weight: 600;
-        text-shadow: 0 0 12px rgba(52, 211, 153, 0.2);
     }
 
     .atelier-negative {
         color: #f87171 !important;
         font-weight: 600;
-        text-shadow: 0 0 12px rgba(248, 113, 113, 0.2);
     }
 
-    /* Neon State Badges */
     .atelier-badge-bullish {
-        background: rgba(16, 185, 129, 0.12);
+        background: rgba(52, 211, 153, 0.1);
         color: #34d399;
-        padding: 5px 12px;
-        border-radius: 6px;
-        font-size: 0.7rem;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        box-shadow: 0 0 12px rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(52, 211, 153, 0.25);
     }
 
     .atelier-badge-bearish {
-        background: rgba(239, 68, 68, 0.12);
+        background: rgba(248, 113, 113, 0.1);
         color: #f87171;
-        padding: 5px 12px;
-        border-radius: 6px;
-        font-size: 0.7rem;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(239, 68, 68, 0.3);
-        box-shadow: 0 0 12px rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(248, 113, 113, 0.25);
     }
 
     .atelier-badge-neutral {
-        background: rgba(113, 113, 122, 0.12);
+        background: rgba(161, 161, 170, 0.1);
         color: #a1a1aa;
-        padding: 5px 12px;
-        border-radius: 6px;
-        font-size: 0.7rem;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 700;
-        border: 1px solid rgba(113, 113, 122, 0.3);
+        border: 1px solid rgba(161, 161, 170, 0.25);
     }
 
     .atelier-symbol-link {
-        color: #38bdf8;
+        color: #dfb15b;
         text-decoration: none;
         font-weight: 600;
-        transition: color 0.2s, text-shadow 0.2s;
+        transition: color 0.2s;
     }
 
     .atelier-symbol-link:hover {
-        color: #7dd3fc;
-        text-decoration: none;
-        text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        color: #fcd34d;
+        text-decoration: underline;
     }
 
-    /* Cyber Inputs & Selectboxes */
+    /* Atelier Selectbox */
     div[data-baseweb="select"] > div {
-        background-color: rgba(15, 23, 42, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background-color: #0e0e12 !important;
+        border: 1px solid rgba(223, 177, 91, 0.3) !important;
         border-radius: 8px !important;
-        color: #f8fafc !important;
-        backdrop-filter: blur(8px);
+        color: #f4f4f5 !important;
     }
 
     div[data-baseweb="select"] span {
-        color: #f8fafc !important;
+        color: #f4f4f5 !important;
     }
 
-    /* Custom Terminal Scrollbars */
+    /* Scrollbars */
     ::-webkit-scrollbar {
-        width: 5px;
-        height: 5px;
+        width: 6px;
+        height: 6px;
     }
     ::-webkit-scrollbar-track {
-        background: #030305;
+        background: #060608;
     }
     ::-webkit-scrollbar-thumb {
         background: #27272a;
-        border-radius: 2px;
+        border-radius: 3px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #10b981;
+        background: #dfb15b;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -276,7 +255,7 @@ def format_signed_pct(val):
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
 def render_atelier_table(df, columns_to_show):
-    """Renders the Cyber-Obsidian glowing glass table."""
+    """Renders the Atelier luxury gold-trimmed table."""
     if df.empty:
         st.info("No data available to display.")
         return
