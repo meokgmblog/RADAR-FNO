@@ -12,7 +12,7 @@ import streamlit as st
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="F&O Institutional Sector Radar",
+    page_title="F&O Institutional Sector Radar & Position Builder",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -194,7 +194,7 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
         
-        # Position Builder Score calculation
+        # Position Builder Score derived from volume surge, absolute price change, and order flow imbalance
         position_builder_score = round(vol_ratio_capped * abs(p_change) * flow_ratio, 2)
         inst_score = p_change + (vwap_dist * 0.8) + ((flow_ratio - 1) * 2) + ((vol_ratio_capped - 1) * 0.5)
 
@@ -238,7 +238,7 @@ def is_market_open():
 # ==========================================
 # 3. STREAMLIT RENDER LOGIC
 # ==========================================
-st.title("⚡F&O Institutional Sector Radar")
+st.title("⚡F&O Institutional Sector Radar & Position Builder")
 
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
@@ -263,20 +263,17 @@ def dashboard_live_loop():
         quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
         data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
         
-        # Continuously hold the latest market data in memory
         if not data_df.empty:
             st.session_state['frozen_df'] = data_df
             st.session_state['frozen_time'] = now_str
             st.session_state['frozen_date'] = today_str
     else:
-        # Market is CLOSED (After 3:13 PM or Before 9:14 AM / Weekends)
         if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
             data_df = st.session_state['frozen_df']
             frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
             st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
             api_error = None
         else:
-            # First load after 3:13 PM (fetch once to freeze final state)
             st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
             quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
             data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
@@ -329,12 +326,12 @@ def dashboard_live_loop():
         )
     }
 
-    # --- Deduplicate Stocks for Leaders ---
     unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
 
-    # --- Active Position Builder Spotlight Table (Added as requested) ---
+    # --- High Position Builder Activity Spotlight ---
     st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
-    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
+    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(5)
+    active_pb_df = active_pb_df.copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
     cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
     st.dataframe(
@@ -368,8 +365,8 @@ def dashboard_live_loop():
         if top_n is not None:
             bullish = bullish.head(top_n)
         bullish = bullish.copy()
-        bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
+        bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Position Builder Score', 'Inst. Score']
         st.dataframe(
             bullish[cols_bullish],
             column_config=table_column_config,
@@ -383,8 +380,8 @@ def dashboard_live_loop():
         if top_n is not None:
             bearish = bearish.head(top_n)
         bearish = bearish.copy()
-        bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
+        bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
+        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Position Builder Score', 'Inst. Score']
         st.dataframe(
             bearish[cols_bearish],
             column_config=table_column_config,
