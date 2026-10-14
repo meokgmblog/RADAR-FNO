@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 
 # ==========================================
-# PAGE CONFIGURATION
+# PAGE CONFIGURATION & PREMIUM CSS INJECTION
 # ==========================================
 st.set_page_config(
     page_title="F&O Institutional Sector Radar",
@@ -17,133 +17,114 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ==========================================
-# PREMIUM UI & ANIMATION STYLING (CSS)
-# ==========================================
+# Custom Advanced UI Styling & Animations
 st.markdown("""
 <style>
     /* Import Google Fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-    /* Global Theme Overrides */
-    html, body, [class*="st"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    
+    /* Global App Background & Font */
     .stApp {
-        background: radial-gradient(circle at 50% 0%, #111827 0%, #030712 100%);
-        color: #f3f4f6;
+        background: radial-gradient(circle at 50% 0%, #0d1117 0%, #05070b 100%);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: #e6edf3;
     }
 
     code, pre, .dataframe {
         font-family: 'JetBrains Mono', monospace !important;
     }
 
-    /* Animations */
-    @keyframes pulseGlow {
-        0% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-        100% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-
+    /* Smooth Fade-In Animation */
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
+        from { opacity: 0; transform: translateY(12px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
-    .animate-fade {
-        animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    .main .block-container {
+        animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 98%;
     }
 
-    /* Hero Header Styling */
-    .hero-container {
-        background: linear-gradient(135deg, rgba(31, 41, 55, 0.7) 0%, rgba(17, 24, 39, 0.8) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        padding: 28px 36px;
-        margin-bottom: 24px;
-        backdrop-filter: blur(16px);
-        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    /* Glassmorphism Containers & Cards */
+    div.stMarkdown, div.stDataFrame, div.stAlert {
+        animation: fadeIn 0.5s ease-out forwards;
     }
 
-    .hero-title {
-        font-size: 2.25rem;
-        font-weight: 800;
-        background: linear-gradient(90deg, #60a5fa 0%, #34d399 50%, #a78bfa 100%);
+    /* Premium Headers */
+    h1 {
+        font-weight: 800 !important;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 50%, #bc8cff 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin: 0 0 8px 0;
-        letter-spacing: -0.02em;
+        margin-bottom: 1.5rem !important;
     }
 
-    .hero-subtitle {
-        color: #9ca3af;
-        font-size: 1rem;
-        font-weight: 500;
-        margin: 0;
-    }
-
-    /* Status Badges */
-    .status-badge-live {
-        display: inline-flex;
-        align-items: center;
-        background: rgba(6, 78, 59, 0.6);
-        border: 1px solid rgba(52, 211, 153, 0.4);
-        color: #34d399;
-        padding: 6px 14px;
-        border-radius: 30px;
-        font-weight: 600;
-        font-size: 0.875rem;
-        animation: pulseGlow 2s infinite;
-    }
-
-    .status-badge-closed {
-        display: inline-flex;
-        align-items: center;
-        background: rgba(127, 29, 29, 0.5);
-        border: 1px solid rgba(248, 113, 113, 0.4);
-        color: #f87171;
-        padding: 6px 14px;
-        border-radius: 30px;
-        font-weight: 600;
-        font-size: 0.875rem;
-    }
-
-    .pulse-dot {
-        width: 8px;
-        height: 8px;
-        background-color: #34d399;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 8px;
-        box-shadow: 0 0 8px #34d399;
-    }
-
-    /* Section Subheaders */
-    h3 {
-        color: #f9fafb !important;
+    h2, h3 {
         font-weight: 700 !important;
-        font-size: 1.35rem !important;
-        margin-top: 2rem !important;
+        letter-spacing: -0.02em;
+        color: #f0f6fc !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 0.5rem;
+        margin-top: 1.5rem !important;
         margin-bottom: 1rem !important;
-        letter-spacing: -0.01em;
-        border-left: 4px solid #60a5fa;
-        padding-left: 12px;
     }
 
-    /* Custom Cards / Containers */
+    /* Success / Warning Banners Styling */
+    div.stAlert {
+        background: rgba(22, 27, 34, 0.7) !important;
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 12px !important;
+        color: #f0f6fc !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Enhanced Dataframe Tables Styling */
     .stDataFrame {
-        border-radius: 12px;
-        overflow: hidden;
+        background: rgba(13, 17, 23, 0.6);
+        backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(17, 24, 39, 0.6);
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        border-radius: 14px;
+        padding: 4px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        transition: all 0.3s ease;
     }
 
-    /* Streamlit Selectbox & Widget Tweaks */
-    .stSelectbox label {
-        color: #d1d5db !important;
-        font-weight: 600 !important;
+    .stDataFrame:hover {
+        border-color: rgba(88, 166, 255, 0.3);
+        box-shadow: 0 16px 48px rgba(88, 166, 255, 0.1);
+    }
+
+    /* Selectbox & UI Controls */
+    div[data-baseweb="select"] > div {
+        background-color: rgba(22, 27, 34, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 10px !important;
+        color: #f0f6fc !important;
+        backdrop-filter: blur(8px);
+    }
+
+    div[data-baseweb="select"] span {
+        color: #f0f6fc !important;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #0d1117;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #30363d;
+        border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #58a6ff;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -343,208 +324,3 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
             'VOLUME_RAW': int(volume),
             'Volume': format_volume(volume),
             'VOL_10D_RATIO_RAW': round(vol_ratio, 2),
-            'Vol / 10D Vol': f"{vol_ratio:.2f}x",
-            'FLOW_RATIO_RAW': round(flow_ratio, 2),
-            'Order Flow': f"{flow_ratio:.2f}x",
-            'POS_BUILDER_SCORE': position_builder_score,
-            'INST_SCORE': round(inst_score, 2),
-        })
-        
-    df = pd.DataFrame(records)
-    if not df.empty and 'POS_BUILDER_SCORE' not in df.columns:
-        df['POS_BUILDER_SCORE'] = 0.0
-    return df
-
-# ==========================================
-# 2. TIME CONTROL
-# ==========================================
-def is_market_open():
-    now = datetime.now(IST)
-    if now.weekday() >= 5:
-        return False
-    start_time = now.replace(hour=9, minute=14, second=0, microsecond=0)
-    end_time = now.replace(hour=15, minute=13, second=0, microsecond=0)
-    return start_time <= now <= end_time
-
-# ==========================================
-# 3. STREAMLIT RENDER LOGIC (PREMIUM UI)
-# ==========================================
-st.markdown("""
-    <div class="hero-container animate-fade">
-        <h1 class="hero-title">⚡ F&O Institutional Sector Radar</h1>
-        <p class="hero-subtitle">Real-time institutional flow tracking, sector momentum, and high-conviction position builder matrix.</p>
-    </div>
-""", unsafe_allow_html=True)
-
-with st.spinner("Initializing Market Mapping & Historical Volumes..."):
-    mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
-    unique_keys = mapped_df['instrument_key'].unique().tolist()
-    avg_10d_vols = fetch_10d_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
-
-@st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
-def dashboard_live_loop():
-    market_status = is_market_open()
-    now = datetime.now(IST)
-    now_str = now.strftime("%H:%M:%S IST")
-    today_str = now.strftime("%Y-%m-%d")
-
-    # Reset cache if a new trading day starts
-    if 'frozen_date' in st.session_state and st.session_state['frozen_date'] != today_str:
-        st.session_state.pop('frozen_df', None)
-        st.session_state.pop('frozen_time', None)
-        st.session_state.pop('frozen_date', None)
-
-    if market_status:
-        st.markdown(f"""
-            <div style="margin-bottom: 20px;">
-                <span class="status-badge-live">
-                    <span class="pulse-dot"></span> MARKET LIVE &nbsp;&bull;&nbsp; Last Updated: {now_str}
-                </span>
-            </div>
-        """, unsafe_allow_html=True)
-        quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-        data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
-        
-        # Continuously hold the latest market data in memory
-        if not data_df.empty:
-            st.session_state['frozen_df'] = data_df
-            st.session_state['frozen_time'] = now_str
-            st.session_state['frozen_date'] = today_str
-    else:
-        # Market is CLOSED (After 3:13 PM or Before 9:14 AM / Weekends)
-        if 'frozen_df' in st.session_state and not st.session_state['frozen_df'].empty:
-            data_df = st.session_state['frozen_df']
-            frozen_at = st.session_state.get('frozen_time', '3:13:00 IST')
-            st.markdown(f"""
-                <div style="margin-bottom: 20px;">
-                    <span class="status-badge-closed">
-                        🔴 MARKET CLOSED — FROZEN AT 3:13 PM (Locked at: {frozen_at})
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-            api_error = None
-        else:
-            # First load after 3:13 PM (fetch once to freeze final state)
-            st.markdown(f"""
-                <div style="margin-bottom: 20px;">
-                    <span class="status-badge-closed">
-                        🔴 MARKET CLOSED — Fetching final snapshot ({now_str})
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-            quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-            data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
-            if not data_df.empty:
-                st.session_state['frozen_df'] = data_df
-                st.session_state['frozen_time'] = now_str
-                st.session_state['frozen_date'] = today_str
-
-    if data_df.empty:
-        st.error("⚠️ **Unable to load live quotes from Upstox API.**")
-        if 'api_error' in locals() and api_error:
-            st.code(f"Upstox Response Error Log:\n{api_error}", language="text")
-        return
-
-    if 'POS_BUILDER_SCORE' not in data_df.columns:
-        data_df['POS_BUILDER_SCORE'] = 0.0
-
-    # --- Sector Summary Table ---
-    st.subheader("Sector Performance Breakdown")
-    sector_stats = []
-    for sector, group in data_df.groupby('SECTOR'):
-        avg_chg = group['CHANGE_%'].mean()
-        advances = (group['CHANGE_%'] > 0).sum()
-        declines = (group['CHANGE_%'] < 0).sum()
-        total_stocks = len(group)
-        breadth_ratio = (advances - declines) / total_stocks if total_stocks > 0 else 0.0
-        top_stock = group.loc[group['INST_SCORE'].idxmax()]['SYMBOL'] if not group.empty else "N/A"
-        sector_score = avg_chg + (0.75 * breadth_ratio)
-        
-        sector_stats.append({
-            "Sector": sector,
-            "Avg Change %": format_signed_pct(avg_chg),
-            "Adv/Dec": f"{advances}/{declines}",
-            "Breadth Ratio": f"{breadth_ratio:+.2f}",
-            "Avg Order Flow": f"{group['FLOW_RATIO_RAW'].mean():.2f}x",
-            "Top Stock": top_stock,
-            "Sector Momentum": "BULLISH" if sector_score > 0.3 else ("BEARISH" if sector_score < -0.3 else "NEUTRAL"),
-            "_SORT_CHG": avg_chg
-        })
-    
-    sector_df = pd.DataFrame(sector_stats).sort_values(by="_SORT_CHG", ascending=False).drop(columns=['_SORT_CHG'])
-    st.dataframe(sector_df, use_container_width=True, hide_index=True)
-
-    # --- Table Config for Interactive TradingView Chart Hyperlinks ---
-    table_column_config = {
-        "CHART_URL": st.column_config.LinkColumn(
-            "Symbol",
-            help="Click symbol name to open TradingView chart",
-            display_text=r"symbol=NSE:([^&]+)"
-        )
-    }
-
-    # --- Deduplicate Stocks for Leaders ---
-    unique_symbols_df = data_df.drop_duplicates(subset=['SYMBOL'])
-
-    # --- Active Position Builder Spotlight Table ---
-    st.subheader("🔥 Active Position Builder Spotlight (High Conviction)")
-    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
-    active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-    cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
-    st.dataframe(
-        active_pb_df[cols_pb],
-        column_config=table_column_config,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # --- Display Count Selection ---
-    st.markdown("<br>", unsafe_allow_html=True)
-    display_option = st.selectbox(
-        "Select Number of Stocks to Display:",
-        options=["Top 10", "Top 20", "All"],
-        index=0
-    )
-
-    if display_option == "Top 10":
-        top_n = 10
-        label_prefix = "Top 10"
-    elif display_option == "Top 20":
-        top_n = 20
-        label_prefix = "Top 20"
-    else:
-        top_n = None
-        label_prefix = "All"
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader(f"{label_prefix} Bullish Momentum Leaders")
-        bullish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=False)
-        if top_n is not None:
-            bullish = bullish.head(top_n)
-        bullish = bullish.copy()
-        bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        st.dataframe(
-            bullish[cols_bullish],
-            column_config=table_column_config,
-            use_container_width=True,
-            hide_index=True
-        )
-
-    with col2:
-        st.subheader(f"{label_prefix} Bearish Short Setups")
-        bearish = unique_symbols_df.sort_values(by='INST_SCORE', ascending=True)
-        if top_n is not None:
-            bearish = bearish.head(top_n)
-        bearish = bearish.copy()
-        bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
-        st.dataframe(
-            bearish[cols_bearish],
-            column_config=table_column_config,
-            use_container_width=True,
-            hide_index=True
-        )
-
-dashboard_live_loop()
