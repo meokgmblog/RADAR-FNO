@@ -270,7 +270,10 @@ def render_atelier_table(df, columns_to_show):
         'Change %': 'Change %',
         'VWAP Dist %': 'VWAP Dist %',
         'Volume': 'Volume',
+        'Vol / 1D Vol': 'Vol / 1D Vol',
+        'Vol / 5D Vol': 'Vol / 5D Vol',
         'Vol / 10D Vol': 'Vol / 10D Vol',
+        'Vol / 20D Vol': 'Vol / 20D Vol',
         'Order Flow': 'Order Flow',
         'Position Builder Score': 'Pos Builder Score',
         'Inst. Score': 'Inst. Score',
@@ -335,7 +338,7 @@ def load_instrument_mapping(excel_path, csv_path):
     merged = pd.merge(fno_clean, nse_eq, left_on='SYMBOL', right_on='trading_symbol', how='inner')
     return merged.drop_duplicates(subset=['SYMBOL', 'SECTOR']).reset_index(drop=True)
 
-def _fetch_single_10d_vol(key, access_token, to_date, from_date):
+def _fetch_single_historical_vols(key, access_token, to_date, from_date):
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'}
     encoded_key = urllib.parse.quote(key, safe='|:')
     url = f"https://api.upstox.com/v2/historical-candle/{encoded_key}/day/{to_date}/{from_date}"
@@ -345,33 +348,37 @@ def _fetch_single_10d_vol(key, access_token, to_date, from_date):
             res = requests.get(url, headers=headers, timeout=4)
             if res.status_code == 200:
                 candles = res.json().get('data', {}).get('candles', [])
-                if candles:
-                    vols = [c[5] for c in candles[1:11]]
-                    if vols:
-                        return key, sum(vols) / len(vols)
+                if len(candles) > 1:
+                    # candles are usually in descending order: index 0 is current/latest incomplete day, index 1 is previous complete day (1D)
+                    history_vols = [c[5] for c in candles[1:]] # exclude index 0 if today, or include past days
+                    vol_1d = history_vols[0] if len(history_vols) > 0 else 0.0
+                    vol_5d = sum(history_vols[:5]) / len(history_vols[:5]) if len(history_vols) >= 5 else (sum(history_vols) / len(history_vols) if history_vols else 0.0)
+                    vol_10d = sum(history_vols[:10]) / len(history_vols[:10]) if len(history_vols) >= 10 else (sum(history_vols) / len(history_vols) if history_vols else 0.0)
+                    vol_20d = sum(history_vols[:20]) / len(history_vols[:20]) if len(history_vols) >= 20 else (sum(history_vols) / len(history_vols) if history_vols else 0.0)
+                    return key, {'1d': vol_1d, '5d': vol_5d, '10d': vol_10d, '20d': vol_20d}
             elif res.status_code == 429:
                 time.sleep(0.25)
         except Exception:
             pass
-    return key, 0.0
+    return key, {'1d': 0.0, '5d': 0.0, '10d': 0.0, '20d': 0.0}
 
 @st.cache_data(ttl=86400)
-def fetch_10d_avg_volumes_throttled(instrument_keys, access_token):
+def fetch_historical_avg_volumes_throttled(instrument_keys, access_token):
     today = datetime.now(IST)
-    from_date = (today - timedelta(days=20)).strftime("%Y-%m-%d")
+    from_date = (today - timedelta(days=35)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
     
     avg_volumes = {}
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
-            executor.submit(_fetch_single_10d_vol, key, access_token, to_date, from_date)
+            executor.submit(_fetch_single_historical_vols, key, access_token, to_date, from_date)
             for key in instrument_keys
         ]
         for future in as_completed(futures):
-            key, vol = future.result()
-            avg_volumes[key] = vol
-            avg_volumes[key.replace('|', ':')] = vol
-            avg_volumes[key.replace(':', '|')] = vol
+            key, v_dict = future.result()
+            avg_volumes[key] = v_dict
+            avg_volumes[key.replace('|', ':')] = v_dict
+            avg_volumes[key.replace(':', '|')] = v_dict
             
     return avg_volumes
 
@@ -411,7 +418,7 @@ def fetch_live_quotes_safe(instrument_keys, access_token):
 
     return quotes_data, last_error
 
-def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
+def process_market_data(mapped_df, quotes_dict, historical_vol_dict):
     records = []
     if not quotes_dict:
         return pd.DataFrame()
@@ -461,9 +468,18 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
         buy_qty = float(quote.get('total_buy_quantity') or 0)
         sell_qty = float(quote.get('total_sell_quantity') or 0)
         
-        avg_vol = avg_10d_vol_dict.get(key, 0.0) or avg_10d_vol_dict.get(symbol, 0.0)
-        vol_ratio = (volume / avg_vol) if avg_vol > 0 else 1.0
-        vol_ratio_capped = min(vol_ratio, 10.0)
+        v_dict = historical_vol_dict.get(key, {}) or historical_vol_dict.get(symbol, {})
+        vol_1d_avg = v_dict.get('1d', 0.0)
+        vol_5d_avg = v_dict.get('5d', 0.0)
+        vol_10d_avg = v_dict.get('10d', 0.0)
+        vol_20d_avg = v_dict.get('20d', 0.0)
+
+        vol_ratio_1d = (volume / vol_1d_avg) if vol_1d_avg > 0 else 1.0
+        vol_ratio_5d = (volume / vol_5d_avg) if vol_5d_avg > 0 else 1.0
+        vol_ratio_10d = (volume / vol_10d_avg) if vol_10d_avg > 0 else 1.0
+        vol_ratio_20d = (volume / vol_20d_avg) if vol_20d_avg > 0 else 1.0
+
+        vol_ratio_capped = min(vol_ratio_10d, 10.0)
         
         vwap_dist = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
         flow_ratio = (buy_qty / sell_qty) if sell_qty > 0 else (1.5 if buy_qty > 0 else 1.0)
@@ -485,8 +501,10 @@ def process_market_data(mapped_df, quotes_dict, avg_10d_vol_dict):
             'VWAP_DIST_STR': format_signed_pct(vwap_dist),
             'VOLUME_RAW': int(volume),
             'Volume': format_volume(volume),
-            'VOL_10D_RATIO_RAW': round(vol_ratio, 2),
-            'Vol / 10D Vol': f"{vol_ratio:.2f}x",
+            'Vol / 1D Vol': f"{vol_ratio_1d:.2f}x",
+            'Vol / 5D Vol': f"{vol_ratio_5d:.2f}x",
+            'Vol / 10D Vol': f"{vol_ratio_10d:.2f}x",
+            'Vol / 20D Vol': f"{vol_ratio_20d:.2f}x",
             'FLOW_RATIO_RAW': round(flow_ratio, 2),
             'Order Flow': f"{flow_ratio:.2f}x",
             'POS_BUILDER_SCORE': position_builder_score,
@@ -517,7 +535,7 @@ st.title("F&O Institutional Sector Radar")
 with st.spinner("Initializing Market Mapping & Historical Volumes..."):
     mapped_df = load_instrument_mapping(FNO_EXCEL_PATH, INSTRUMENTS_CSV_PATH)
     unique_keys = mapped_df['instrument_key'].unique().tolist()
-    avg_10d_vols = fetch_10d_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
+    historical_vols = fetch_historical_avg_volumes_throttled(unique_keys, ACCESS_TOKEN)
 
 @st.fragment(run_every=REFRESH_INTERVAL_SECONDS if is_market_open() else None)
 def dashboard_live_loop():
@@ -535,7 +553,7 @@ def dashboard_live_loop():
     if market_status:
         st.success(f"🟢 **MARKET LIVE** — Last Updated: {now_str}")
         quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-        data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+        data_df = process_market_data(mapped_df, quotes, historical_vols)
         
         if not data_df.empty:
             st.session_state['frozen_df'] = data_df
@@ -550,7 +568,7 @@ def dashboard_live_loop():
         else:
             st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
             quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-            data_df = process_market_data(mapped_df, quotes, avg_10d_vols)
+            data_df = process_market_data(mapped_df, quotes, historical_vols)
             if not data_df.empty:
                 st.session_state['frozen_df'] = data_df
                 st.session_state['frozen_time'] = now_str
@@ -598,7 +616,7 @@ def dashboard_live_loop():
     st.subheader("Active Position Builder Spotlight (High Conviction)")
     active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-    cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 10D Vol', 'Position Builder Score', 'Inst. Score']
+    cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 1D Vol', 'Vol / 5D Vol', 'Vol / 10D Vol', 'Vol / 20D Vol', 'Position Builder Score', 'Inst. Score']
     render_atelier_table(active_pb_df, cols_pb)
 
     # --- Display Count Selection ---
@@ -626,7 +644,7 @@ def dashboard_live_loop():
             bullish = bullish.head(top_n)
         bullish = bullish.copy()
         bullish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
+        cols_bullish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 1D Vol', 'Vol / 5D Vol', 'Vol / 10D Vol', 'Vol / 20D Vol', 'Order Flow', 'Inst. Score']
         render_atelier_table(bullish, cols_bullish)
 
     with col2:
@@ -636,7 +654,7 @@ def dashboard_live_loop():
             bearish = bearish.head(top_n)
         bearish = bearish.copy()
         bearish.rename(columns={'CHANGE_STR': 'Change %', 'VWAP_DIST_STR': 'VWAP Dist %', 'INST_SCORE': 'Inst. Score'}, inplace=True)
-        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 10D Vol', 'Order Flow', 'Inst. Score']
+        cols_bearish = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'VWAP Dist %', 'Volume', 'Vol / 1D Vol', 'Vol / 5D Vol', 'Vol / 10D Vol', 'Vol / 20D Vol', 'Order Flow', 'Inst. Score']
         render_atelier_table(bearish, cols_bearish)
 
 dashboard_live_loop()
