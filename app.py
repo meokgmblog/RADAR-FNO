@@ -592,13 +592,9 @@ def dashboard_live_loop():
             st.warning(f"🔴 **MARKET CLOSED — FROZEN AT 3:13 PM IST** (Data locked at: {frozen_at})")
             api_error = None
         else:
-            st.warning(f"🔴 **MARKET CLOSED** — Fetching final 3:13 PM market snapshot. Current time: {now_str}")
-            quotes, api_error = fetch_live_quotes_safe(unique_keys, ACCESS_TOKEN)
-            data_df = process_market_data(mapped_df, quotes, historical_vols)
-            if not data_df.empty:
-                st.session_state['frozen_df'] = data_df
-                st.session_state['frozen_time'] = now_str
-                st.session_state['frozen_date'] = today_str
+            st.warning(f"🔴 **MARKET CLOSED** — Market is offline. Data updates resume during market hours (9:15 AM - 3:13 PM IST).")
+            data_df = pd.DataFrame()
+            api_error = None
 
     if data_df.empty:
         st.error("⚠️ **Unable to load live quotes from Upstox API.**")
