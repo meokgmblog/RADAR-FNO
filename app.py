@@ -614,7 +614,7 @@ def dashboard_live_loop():
 
     # --- Active Position Builder Spotlight Table ---
     st.subheader("Active Position Builder Spotlight (High Conviction)")
-    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(10).copy()
+    active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(40).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
     cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 1D Vol', 'Vol / 5D Vol', 'Vol / 10D Vol', 'Vol / 20D Vol', 'Position Builder Score', 'Inst. Score']
     render_atelier_table(active_pb_df, cols_pb)
