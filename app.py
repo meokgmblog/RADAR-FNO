@@ -108,12 +108,6 @@ st.markdown("""
         animation: atelierFade 0.5s ease-out forwards;
     }
 
-    /* Specific scrollable container for 10 rows */
-    .atelier-table-scroll-container {
-        max-height: 480px;
-        overflow-y: auto;
-    }
-
     .atelier-table {
         width: 100%;
         border-collapse: collapse;
@@ -157,11 +151,6 @@ st.markdown("""
 
     .atelier-negative {
         color: #f87171 !important;
-        font-weight: 600;
-    }
-
-    .atelier-warning {
-        color: #facc15 !important;
         font-weight: 600;
     }
 
@@ -265,14 +254,13 @@ def format_volume(vol):
 def format_signed_pct(val):
     return f"+{val:.2f}%" if val > 0 else f"{val:.2f}%"
 
-def render_atelier_table(df, columns_to_show, enable_scroll=False, color_vol_ratios=False):
-    """Renders the Atelier luxury gold-trimmed table with optional scrolling and volume coloring."""
+def render_atelier_table(df, columns_to_show):
+    """Renders the Atelier luxury gold-trimmed table."""
     if df.empty:
         st.info("No data available to display.")
         return
 
-    wrapper_class = "atelier-table-wrapper atelier-table-scroll-container" if enable_scroll else "atelier-table-wrapper"
-    html = f'<div class="{wrapper_class}"><table class="atelier-table"><thead><tr>'
+    html = '<div class="atelier-table-wrapper"><table class="atelier-table"><thead><tr>'
     
     display_cols = [c for c in columns_to_show if c in df.columns]
     header_names = {
@@ -289,6 +277,7 @@ def render_atelier_table(df, columns_to_show, enable_scroll=False, color_vol_rat
         'Order Flow': 'Order Flow',
         'Position Builder Score': 'Pos Builder Score',
         'Inst. Score': 'Inst. Score',
+        'Sector': 'Sector',
         'Avg Change %': 'Avg Change %',
         'Adv/Dec': 'Adv/Dec',
         'Breadth Ratio': 'Breadth Ratio',
@@ -301,8 +290,6 @@ def render_atelier_table(df, columns_to_show, enable_scroll=False, color_vol_rat
         html += f"<th>{header_names.get(col, col)}</th>"
     html += "</tr></thead><tbody>"
 
-    vol_ratio_cols = ['Vol / 1D Vol', 'Vol / 5D Vol', 'Vol / 10D Vol', 'Vol / 20D Vol']
-
     for _, row in df.iterrows():
         html += "<tr>"
         for col in display_cols:
@@ -313,19 +300,6 @@ def render_atelier_table(df, columns_to_show, enable_scroll=False, color_vol_rat
                 symbol_name = row.get('SYMBOL', str_val)
                 url = str_val
                 cell_content = f'<a href="{url}" target="_blank" class="atelier-symbol-link">{symbol_name} ↗</a>'
-            elif color_vol_ratios and col in vol_ratio_cols:
-                clean_val = str_val.replace('x', '').strip()
-                try:
-                    f_val = float(clean_val)
-                    if f_val > 1.2:
-                        cls = "atelier-positive"
-                    elif f_val < 0.8:
-                        cls = "atelier-negative"
-                    else:
-                        cls = "atelier-warning"
-                    cell_content = f'<span class="{cls}">{str_val}</span>'
-                except:
-                    cell_content = str_val
             elif any(k in col.lower() for k in ['change', 'dist']):
                 clean_val = str_val.replace('%', '').replace('+', '').strip()
                 try:
@@ -643,7 +617,7 @@ def dashboard_live_loop():
     active_pb_df = unique_symbols_df.sort_values(by='POS_BUILDER_SCORE', ascending=False).head(20).copy()
     active_pb_df.rename(columns={'CHANGE_STR': 'Change %', 'POS_BUILDER_SCORE': 'Position Builder Score', 'INST_SCORE': 'Inst. Score'}, inplace=True)
     cols_pb = ['CHART_URL', 'SECTOR', 'LTP (₹)', 'Change %', 'Volume', 'Vol / 1D Vol', 'Vol / 5D Vol', 'Vol / 10D Vol', 'Vol / 20D Vol', 'Position Builder Score', 'Inst. Score']
-    render_atelier_table(active_pb_df, cols_pb, enable_scroll=True, color_vol_ratios=True)
+    render_atelier_table(active_pb_df, cols_pb)
 
     # --- Display Count Selection ---
     display_option = st.selectbox(
